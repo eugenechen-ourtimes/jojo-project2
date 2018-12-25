@@ -3,11 +3,14 @@
 #include "LoginResult.hpp"
 #include "SignUpHelper.hpp"
 #include <assert.h>
+#include <ctype.h>
+#define PasswordBuffer 1024
 
 class CommandHelper {
 	public:
 		static const string strEmpty;	/* [Empty] */
 		static const string strHidden;  /* [Hidden] */
+		static const string savedPasswordFolder; /* ../data/client/ */
 
 		static const string HELP;		/* help */
 		static const string REFRESH;	/* refresh */
@@ -29,6 +32,7 @@ class CommandHelper {
 			this->state = state;
 			showHomePage();
 			signUpHelper.setFd(connFd);
+			memset(storedPassword, '\0', PasswordBuffer);
 		}
 
 		void help()
@@ -136,12 +140,25 @@ class CommandHelper {
 				refresh() ;
 				return  ;
 			}
-			fprintf(stderr,"Please key in your password or input \033[33m\033[1m\\return \033[0m to exit\n");
+
 			char* password;
-			password = getpass("Input your password: ");
-			if(!strcmp(password,"\\return")){
-				refresh() ;
-				return  ;
+
+			string savedPasswordPath = savedPasswordFolder + string(ID);
+			FILE *fp = fopen(savedPasswordPath.c_str(), "r");
+			bool passwordFileAccessible = (fp != NULL);
+			if (passwordFileAccessible) {
+				fprintf(stderr,"\033[33m\033[5mfast login\033[0m\n");
+				if (fscanf(fp, "%s", storedPassword) == EOF) storedPassword[0] = '\0';
+				password = storedPassword;
+				fclose(fp);
+			} else {
+				/*perror(savedPasswordPath.c_str());*/
+				fprintf(stderr,"Please key in your password or input \033[33m\033[1m\\return \033[0m to exit\n");
+				password = getpass("Input your password: ");
+				if (!strcmp(password,"\\return")){
+					refresh();
+					return;
+				}
 			}
 			
 			Command command = ::login;
@@ -158,20 +175,29 @@ class CommandHelper {
 
 			if (result == Login) {
 				fprintf(stderr, GRN "=> login successful\n" RESET);
-				username = string(ID) ;
-				state = ::ONLINE ;
+				username = string(ID);
+				state = ::ONLINE;
+				if (!passwordFileAccessible) {
+					savePassword(savedPasswordPath.c_str(), password);
+				}
 				refresh();
 				return ;
 			}
 
 			if (result == UsernameDoesNotExist) {
 				fprintf(stderr, YEL "=> username does not exist\n" RESET);
+				if (passwordFileAccessible) {
+					unlink(savedPasswordPath.c_str());
+				}
 				refresh();
 				return;
 			}
 
 			if (result == PasswordIncorrect) {
 				fprintf(stderr, RED "=> password incorrect\n" RESET);
+				if (passwordFileAccessible) {
+					unlink(savedPasswordPath.c_str());
+				}
 				refresh();
 				return;
 			}
@@ -190,7 +216,33 @@ class CommandHelper {
 				return;
 			}
 
-			fprintf(stderr, "server seems to disconnect\n");
+			fprintf(stderr, "server seems disconnected\n");
+		}
+
+		void savePassword(string path, char *password)
+		{
+			FILE *fp = fopen(path.c_str(), "w");
+			if (fp == NULL) {
+				/* perror(path.c_str()); */
+				return;
+			}
+
+			fprintf(stderr, "\033[31m\033[1mDo you want to save your password? (Y/N) : \033[0m");
+			char line[64];
+			char feedback[64];
+			fgets(line, 64, stdin);
+			sscanf(line, "%s", feedback);
+			int L = strlen(feedback);
+			for (int i = 0; i < L; i++)
+				feedback[i] = tolower(feedback[i]);
+
+			if (strcmp(feedback, "y") == 0 || strcmp(feedback, "yes") == 0) {
+				fprintf(fp, "%s\n", password);
+				fclose(fp);
+			} else {
+				fclose(fp);
+				unlink(path.c_str());
+			}
 		}
 
 		void quit()
@@ -402,6 +454,7 @@ class CommandHelper {
 
 		
 	private:
+		char storedPassword[PasswordBuffer];
 		int connFd;
 		State state;
 		string username;
@@ -439,6 +492,7 @@ class CommandHelper {
 
 const string CommandHelper::strEmpty = "[Empty]";
 const string CommandHelper::strHidden = "[Hidden]";
+const string CommandHelper::savedPasswordFolder = "../data/client/";
 
 const string CommandHelper::HELP = "\\help";
 const string CommandHelper::REFRESH = "\\refresh";

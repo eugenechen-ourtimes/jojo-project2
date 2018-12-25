@@ -133,7 +133,7 @@ class Server {
 
 
 
-const string Server::usersFileName = "../data/user.txt";
+const string Server::usersFileName = "../data/server/user.txt";
 
 
 
