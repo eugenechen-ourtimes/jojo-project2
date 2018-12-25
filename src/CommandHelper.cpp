@@ -1,6 +1,7 @@
 #include "color.hpp"
 #include "CreateAccountResult.hpp"
 #include "LoginResult.hpp"
+#include "SignUpHelper.hpp"
 #include <assert.h>
 
 class CommandHelper {
@@ -23,10 +24,11 @@ class CommandHelper {
 		static const string LOGOUT;		/* logout */
 
 		CommandHelper(int connFd, State state) {
-			username = string("jojo");
+			username = string("anonymous");
 			this->connFd = connFd;
 			this->state = state;
 			showHomePage();
+			signUpHelper.setFd(connFd);
 		}
 
 		void help()
@@ -217,6 +219,7 @@ class CommandHelper {
 				return;
 			}
 			signUpHelper.handleInputUsername(arg);
+			signUpHelper.refresh();
 		}
 
 		void setPassword()
@@ -234,6 +237,7 @@ class CommandHelper {
 			char *password;
 			password = getpass("Please key in your password: ");
 			signUpHelper.handleInputPassword(string(password));
+			signUpHelper.refresh();
 		}
 
 		void confirmPassword()
@@ -256,6 +260,7 @@ class CommandHelper {
 			char *password;
 			password = getpass("Please re-input your password: ");
 			signUpHelper.handleConfirmPassword(string(password));
+			signUpHelper.refresh();
 		}
 
 		void cancelSignUp()
@@ -383,197 +388,13 @@ class CommandHelper {
 			}
 		}
 
-		class SignUpHelper {
-			private:
-				CommandHelper& outer;
-				bool usernameTaken = false;
 
-				string username;
-				string password;
-				string confirmPassword;
-
-				bool passwordMatched() {
-					return password == confirmPassword;
-				}
-
-				bool passwordTooShort() {
-					return password.length() < passwordMinLength;
-				}
-
-				bool usernameTooLong() {
-					return username.length() > usernameMaxLength;
-				}
-
-				bool usernameVaildLocal()
-				{
-					return !usernameTooLong() && !username.empty();
-				}
-
-				bool formComplete()
-				{
-					return usernameValid() && passwordValid() && passwordMatched();
-				}
-
-				void setUsername(string username)
-				{
-					this->username = username;
-				}
-
-				void setPassword(string password)
-				{
-					this->password = password;
-				}
-
-				void setConfirmPassword(string confirmPassword)
-				{
-					this->confirmPassword = confirmPassword;
-				}
-				
-			public:
-				/* TODO Username may only contain alphanumeric characters */
-				static const int passwordMinLength = 5;
-				static const int usernameMaxLength = 10;
-
-				SignUpHelper(CommandHelper& ref): outer(ref) {}
-
-				bool usernameValid()
-				{
-					return usernameVaildLocal() && !usernameTaken;
-				}
-
-				bool passwordValid()
-				{
-					return !passwordTooShort();
-				}
-				
-				void reset()
-				{
-					usernameTaken = false;
-					setUsername("");
-					setPassword("");
-					setConfirmPassword("");
-				}
-
-				void handleInputUsername(string username)
-				{
-					int &connFd = outer.connFd;
-					setUsername(username);
-					if (usernameVaildLocal()) {
-						/* check if this username is taken */
-						Command command = ::checkUsernameTaken;
-						int usernameLen = username.length();
-						::send(connFd, &command, sizeof(int), 0);
-						::send(connFd, &usernameLen, sizeof(int), 0);
-						::send(connFd, username.c_str(), usernameLen, 0);
-						::recv(connFd, &usernameTaken, sizeof(bool), 0);
-					} 
-					refresh();
-				}
-
-				void handleInputPassword(string password)
-				{
-					setPassword(password);
-					setConfirmPassword("");
-					refresh();
-				}
-
-				void handleConfirmPassword(string confirmPassword)
-				{
-					setConfirmPassword(confirmPassword);
-					refresh();
-				}
-
-				void cancel()
-				{
-					Command command = ::cancelSignUp;
-					int &connFd = outer.connFd;
-					bool ack = false;
-					::send(connFd, &command, sizeof(int), 0);
-					::recv(connFd, &ack, sizeof(bool), 0);
-					if (!ack) {
-						fprintf(stderr, "cancel error\n");
-						exit(-1);
-					}
-				}
-
-				CreateAccountResult createAccount()
-				{
-					if (!formComplete()) {
-						return Incomplete;
-					}
-
-					int &connFd = outer.connFd;
-					Command command = ::createAccount;
-					int usernameLen = username.length();
-					int passwordLen = password.length();
-					::send(connFd, &command, sizeof(int), 0);
-
-					::send(connFd, &usernameLen, sizeof(int), 0);
-					::send(connFd, username.c_str(), usernameLen, 0);
-					
-					::send(connFd, &passwordLen, sizeof(int), 0);
-					::send(connFd, password.c_str(), passwordLen, 0);
-					CreateAccountResult result = Undefined;
-					::recv(connFd, &result, sizeof(int), 0);
-					
-					if (result == UsernameTaken) {
-						usernameTaken = true;
-					}
-					return result;
-				}
-
-				void refresh()
-				{
-					fprintf(stderr, "    Username:     %15s #Make sure Username is no more than %2d characters\n",
-						username.empty() ? strEmpty.c_str(): username.c_str(),
-						usernameMaxLength);
-
-					fprintf(stderr, "    Password:     %15s #Make sure Password is no less than %2d characters\n",
-						password.empty() ? strEmpty.c_str(): strHidden.c_str(),
-						passwordMinLength);
-
-					fprintf(stderr, "    Confirm Password: %15s\n",
-						confirmPassword.empty() ? strEmpty.c_str(): strHidden.c_str());
-
-					if (usernameTooLong()) {
-						fprintf(stderr, YEL "=> Username Too Long\n" RESET);
-						return;
-					}
-
-					if (usernameTaken) {
-						fprintf(stderr, YEL "=> Username Already Taken\n" RESET);
-						return;
-					}
-
-					if (!password.empty() && passwordTooShort()) {
-						fprintf(stderr, YEL "=> Password Too Short\n" RESET);
-						return;
-					}
-
-					if (!confirmPassword.empty() && !passwordMatched()) {
-						fprintf(stderr, YEL "=> Password Mismatched\n" RESET);
-						return;
-					}
-
-					if (passwordValid() && confirmPassword.empty()) {
-						fprintf(stderr,"Please input \033[33m\033[1m \\confirm-password\033[0m before creating account.\n");
-						return;
-					}
-
-					if (formComplete()) {
-						fprintf(stderr, GRN "=> Ready to create account \n" RESET);
-					}
-
-					fprintf(stderr,"\nStart with an instruction\n");
-					fprintf(stderr,"\033[33m\033[1m\\create-account   \\username [%s]   \\password   \\confirm-password   \\cancel \033[0m\n","%s");
-				}
-		};
-
+		
 	private:
 		int connFd;
 		State state;
 		string username;
-		class SignUpHelper signUpHelper = SignUpHelper(*this);
+		SignUpHelper signUpHelper;
 		
 		void promptReturningToHomePage() {
 			fprintf(stderr, "returning to home page ...\n%s\n", del);

@@ -7,7 +7,7 @@ CPPFLAG=-std=c++11#-g -pthread -Wall #-D PRINT_DEBUG
 GCC=g++
 BIN=../bin
 
-CLIENT_OBJS=Client.o option.o
+CLIENT_OBJS=Client.o option.o SignUpHelper.o
 SERVER_OBJS=Server.o option.o
 
 %.o: %.c
