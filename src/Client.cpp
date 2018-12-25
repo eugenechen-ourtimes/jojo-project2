@@ -36,14 +36,14 @@ class Client {
 		void run()
 		{
 			CommandHelper helper(connFd, ::HOME);
-			char line[100];
-			char arg0[100];
-			char arg1[100];
-			char arg2[100];
-			char arg3[100];
+			char line[1000];
+			char arg0[1000];
+			char arg1[1000];
+			char arg2[1000];
+			char arg3[1000];
 			while (true) {
 				fprintf(stderr, "> ");
-				fgets(line, 100, stdin);
+				fgets(line, 1000, stdin);
 				int ret = sscanf(line, "%s%s%s%s", arg0, arg1, arg2, arg3);
 
 				if (ret <= 0) continue;
@@ -82,12 +82,12 @@ class Client {
 				}
 
 				if (strCommand == CommandHelper::PASSWORD) {
-					helper.setPassword((ret == 2) ? string(arg1): "");
+					helper.setPassword();
 					continue;
 				}
 
 				if (strCommand == CommandHelper::CONFIRM_PASSWORD) {
-					helper.confirmPassword((ret == 2) ? string(arg1): "");
+					helper.confirmPassword();
 					continue;
 				}
 

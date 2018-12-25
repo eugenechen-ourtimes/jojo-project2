@@ -6,6 +6,7 @@
 class CommandHelper {
 	public:
 		static const string strEmpty;	/* [Empty] */
+		static const string strHidden;  /* [Hidden] */
 
 		static const string HELP;		/* help */
 		static const string REFRESH;	/* refresh */
@@ -218,31 +219,43 @@ class CommandHelper {
 			signUpHelper.handleInputUsername(arg);
 		}
 
-		void setPassword(string arg)
+		void setPassword()
 		{
 			if (state != ::REGISTER) {
 				promptStateIncorrect();
+				return;
+			}
+
+			if (!signUpHelper.usernameValid()) {
+				fprintf(stderr, "Please complete username first\n");
 				return;
 			}
 
 			char *password;
 			password = getpass("Please key in your password: ");
-			arg.assign(password);
-			signUpHelper.handleInputPassword(arg);
+			signUpHelper.handleInputPassword(string(password));
 		}
 
-		void confirmPassword(string arg)
+		void confirmPassword()
 		{
 			if (state != ::REGISTER) {
 				promptStateIncorrect();
 				return;
 			}
 
+			if (!signUpHelper.usernameValid()) {
+				fprintf(stderr, "Please complete username first\n");
+				return;
+			}
+
+			if (!signUpHelper.passwordValid()) {
+				fprintf(stderr, "Please complete password first\n");
+				return;
+			}
+
 			char *password;
 			password = getpass("Please re-input your password: ");
-			arg.assign(password);
-
-			signUpHelper.handleConfirmPassword(arg);
+			signUpHelper.handleConfirmPassword(string(password));
 		}
 
 		void cancelSignUp()
@@ -374,33 +387,31 @@ class CommandHelper {
 			private:
 				CommandHelper& outer;
 				bool usernameTaken = false;
-				bool usernameTooLong = false;
-				bool passwordTooShort = true;
-				bool passwordMatched = true;
-				bool confirmTooEarly = false;
 
 				string username;
 				string password;
 				string confirmPassword;
 
-				bool usernameValid()
-				{
-					return usernameVaildLocal() && !usernameTaken;
+				bool passwordMatched() {
+					return password == confirmPassword;
+				}
+
+				bool passwordTooShort() {
+					return password.length() < passwordMinLength;
+				}
+
+				bool usernameTooLong() {
+					return username.length() > usernameMaxLength;
 				}
 
 				bool usernameVaildLocal()
 				{
-					return !usernameTooLong;
-				}
-
-				bool passwordValid()
-				{
-					return !passwordTooShort;
+					return !usernameTooLong() && !username.empty();
 				}
 
 				bool formComplete()
 				{
-					return usernameValid() && passwordValid() && passwordMatched;
+					return usernameValid() && passwordValid() && passwordMatched();
 				}
 
 				void setUsername(string username)
@@ -424,24 +435,29 @@ class CommandHelper {
 				static const int usernameMaxLength = 10;
 
 				SignUpHelper(CommandHelper& ref): outer(ref) {}
+
+				bool usernameValid()
+				{
+					return usernameVaildLocal() && !usernameTaken;
+				}
+
+				bool passwordValid()
+				{
+					return !passwordTooShort();
+				}
 				
 				void reset()
 				{
 					usernameTaken = false;
-					usernameTooLong = false;
-					passwordTooShort = true;
-					passwordMatched = true;
-					confirmTooEarly = false;
-					username = "";
-					password = "";
-					confirmPassword = "";
+					setUsername("");
+					setPassword("");
+					setConfirmPassword("");
 				}
 
 				void handleInputUsername(string username)
 				{
 					int &connFd = outer.connFd;
 					setUsername(username);
-					usernameTooLong = (username.length() > usernameMaxLength);
 					if (usernameVaildLocal()) {
 						/* check if this username is taken */
 						Command command = ::checkUsernameTaken;
@@ -456,40 +472,15 @@ class CommandHelper {
 
 				void handleInputPassword(string password)
 				{
-					if(username.empty()){
-						fprintf(stderr, "Please input username first\n");
-						return;
-					}
 					setPassword(password);
-					passwordTooShort = (password.length() < passwordMinLength);
-					confirmPassword = "";
-					passwordMatched = false;
-					if (!password.empty() && passwordTooShort){ 
-						setPassword("");
-						fprintf(stderr, "\n");
-						refresh();
-						fprintf(stderr, YEL "=> Password Too Short\n" RESET);
-					}
-					else{
-						fprintf(stderr,"Please input \033[33m\033[1m \\confirm-password\033[0m before creating account.\n");
-					}
+					setConfirmPassword("");
+					refresh();
 				}
 
 				void handleConfirmPassword(string confirmPassword)
 				{
-					if (!passwordValid()) {
-						confirmTooEarly = true;
-						refresh();
-						confirmTooEarly = false;
-						return;
-					}
-
 					setConfirmPassword(confirmPassword);
-					passwordMatched = (password == confirmPassword);
-
-					if (formComplete()) {
-						fprintf(stderr, GRN "=> Ready to create account \n" RESET);
-					}
+					refresh();
 				}
 
 				void cancel()
@@ -537,39 +528,44 @@ class CommandHelper {
 						username.empty() ? strEmpty.c_str(): username.c_str(),
 						usernameMaxLength);
 
-					if (!username.empty()) {
-						if (usernameTooLong)
-							fprintf(stderr, YEL "=> Username Too Long\n" RESET);
-						else {
-							if (usernameTaken)
-								fprintf(stderr, YEL "=> Username Already Taken\n" RESET);
-						}
-					}
-
 					fprintf(stderr, "    Password:     %15s #Make sure Password is no less than %2d characters\n",
-						password.empty() ? strEmpty.c_str(): password.c_str(),
+						password.empty() ? strEmpty.c_str(): strHidden.c_str(),
 						passwordMinLength);
 
-					if (!password.empty() && passwordTooShort) 
-						fprintf(stderr, YEL "=> Password Too Short\n" RESET);
-		
-
 					fprintf(stderr, "    Confirm Password: %15s\n",
-						confirmPassword.empty() ? strEmpty.c_str(): confirmPassword.c_str());
+						confirmPassword.empty() ? strEmpty.c_str(): strHidden.c_str());
 
-					fprintf(stderr,"\nStart with an instruction\n");
-					fprintf(stderr,"\033[33m\033[1m\\create-account   \\username [%s]   \\password   \\confirm-password   \\cancel \033[0m\n","%s");
+					if (usernameTooLong()) {
+						fprintf(stderr, YEL "=> Username Too Long\n" RESET);
+						return;
+					}
 
-					if (confirmTooEarly) {
-						fprintf(stderr, YEL "=> can\'t confirm password before having a valid one\n" RESET);
-					} else {
-						if (!confirmPassword.empty() && !passwordMatched)
-							fprintf(stderr, YEL "=> Password Mismatched\n" RESET);
+					if (usernameTaken) {
+						fprintf(stderr, YEL "=> Username Already Taken\n" RESET);
+						return;
+					}
+
+					if (!password.empty() && passwordTooShort()) {
+						fprintf(stderr, YEL "=> Password Too Short\n" RESET);
+						return;
+					}
+
+					if (!confirmPassword.empty() && !passwordMatched()) {
+						fprintf(stderr, YEL "=> Password Mismatched\n" RESET);
+						return;
+					}
+
+					if (passwordValid() && confirmPassword.empty()) {
+						fprintf(stderr,"Please input \033[33m\033[1m \\confirm-password\033[0m before creating account.\n");
+						return;
 					}
 
 					if (formComplete()) {
 						fprintf(stderr, GRN "=> Ready to create account \n" RESET);
 					}
+
+					fprintf(stderr,"\nStart with an instruction\n");
+					fprintf(stderr,"\033[33m\033[1m\\create-account   \\username [%s]   \\password   \\confirm-password   \\cancel \033[0m\n","%s");
 				}
 		};
 
@@ -610,6 +606,7 @@ class CommandHelper {
 };
 
 const string CommandHelper::strEmpty = "[Empty]";
+const string CommandHelper::strHidden = "[Hidden]";
 
 const string CommandHelper::HELP = "\\help";
 const string CommandHelper::REFRESH = "\\refresh";
