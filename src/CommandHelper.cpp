@@ -283,14 +283,34 @@ class CommandHelper {
 			}
 
 			CreateAccountResult result = signUpHelper.createAccount();
-			if (result == Incomplete) {
-				fprintf(stderr, "please complete the form first\n");
+
+			if (result == UsernameInvalid) {
+				fprintf(stderr, "Username Invalid\n%s\n", del);
+				return;
+			}
+
+			if (result == PasswordInvalid) {
+				fprintf(stderr, "Password Invalid\n%s\n", del);
 				return;
 			}
 
 			if (result == UsernameTaken) {
 				fprintf(stderr, "sorry, this account was taken by another client process\n%s\n", del);
 				signUpHelper.refresh();
+				return;
+			}
+
+			if (result == FullAccount) {
+				fprintf(stderr, "rejected (full account)\n");
+				promptReturningToHomePage();
+				state = ::HOME;
+				signUpHelper.reset();
+				showHomePage();
+				return;
+			}
+
+			if (result == Incomplete) {
+				fprintf(stderr, "please complete the form first\n");
 				return;
 			}
 
@@ -302,15 +322,6 @@ class CommandHelper {
 				showHomePage();
 				return;
 			} 
-
-			if (result == FullAccount) {
-				fprintf(stderr, "rejected (full account)\n");
-				promptReturningToHomePage();
-				state = ::HOME;
-				signUpHelper.reset();
-				showHomePage();
-				return;
-			}
 
 			fprintf(stderr, "server seems to disconnect\n");
 		}

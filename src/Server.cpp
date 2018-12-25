@@ -19,6 +19,7 @@
 #include <string>
 #include <algorithm>
 #include <assert.h>
+#include "SignUpUtils.hpp"
 
 using namespace std;
 
@@ -338,6 +339,7 @@ void Server::CommandHandler::checkUsernameTaken(int connFd)
 void Server::CommandHandler::createAccount(int connFd)
 {
 	CreateAccountResult result = OK;
+	SignUpUtils utils;
 
 	map < int, State > &states = server.states;
 
@@ -354,21 +356,29 @@ void Server::CommandHandler::createAccount(int connFd)
 	recv(connFd, password, passwordLen, 0);
 	password[passwordLen] = '\0';
 
-	string _username(username);
-	string _password(password);
+	utils.setUsername(string(username));
+	utils.setPassword(string(password));
 
-	if (credentials.size() >= maxAccount) {
-		result = FullAccount;
-		states[connFd] = ::HOME;
+	if (!utils.usernameValid()) {
+		result = UsernameInvalid;
 	} else {
-		if (credentials.find(_username) != credentials.end()) {
-			result = UsernameTaken;
+		if (!utils.passwordValid()) {
+			result = PasswordInvalid;
+		} else {
+			if (credentials.find(utils.getUsername()) != credentials.end())
+				result = UsernameTaken;
+			else {
+				if (credentials.size() >= maxAccount) {
+					result = FullAccount;
+					states[connFd] = ::HOME;
+				}
+			}
 		}
 	}
 
 	if (result == OK) {
 		states[connFd] = ::HOME;
-		credentials[_username] = _password;
+		credentials[utils.getUsername()] = utils.getPassword();
 		fprintf(stderr, "create account <%s, %s>\n", username, password);
 		fprintf(server.usersFile, "%s %s\n", username, password);
 		fflush(server.usersFile);
