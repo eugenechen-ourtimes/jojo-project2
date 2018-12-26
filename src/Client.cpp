@@ -14,7 +14,7 @@ using namespace std;
 #include "State.hpp"
 #include "Command.hpp"
 #include "CommandHelper.cpp"
-
+#include <sys/select.h>
 
 static Option options[] = {
 	{ OPT_STRING, "host", &host, "remote host"},
@@ -25,6 +25,7 @@ class Client {
 	public:
 		SocketAddr remote;
 		int connFd;
+		State nowstate = ::HOME;
 		Client() {
 			connFd = connect();
 			if (connFd < 0) exit(-1);
@@ -35,26 +36,45 @@ class Client {
 		}
 		void run()
 		{
-			CommandHelper helper(connFd, ::HOME);
+			CommandHelper helper(connFd, nowstate);
 			char line[1000];
 			char arg0[1000];
 			char arg1[1000];
 			char arg2[1000];
 			char arg3[1000];
-			while (true) {
+			int time = 1;
+			
+			fd_set read_set;
+			fd_set working_set ;
+			FD_ZERO(&read_set);
+			FD_ZERO(&working_set);
+			FD_SET(connFd, &read_set);
+			FD_SET(STDIN_FILENO, &read_set);
+			//select(connFd, &read_set)
+			while (1) {
+
+				memcpy(&working_set, &read_set, sizeof(fd_set) );
+				select(connFd + 1 , &working_set, NULL, NULL, NULL);
+				//fprintf(stderr, "> ");
+				
+				if(FD_ISSET(STDIN_FILENO, &working_set)){
+
 				fprintf(stderr, "> ");
 				fgets(line, 1000, stdin);
+				
 				int ret = sscanf(line, "%s%s%s%s", arg0, arg1, arg2, arg3);
-
+				
 				if (ret <= 0) continue;
 				string strCommand(arg0);
 
 				if (strCommand == CommandHelper::HELP) {
+					//time++;
 					helper.help();
 					continue;
 				}
 
 				if (strCommand == CommandHelper::REFRESH) {
+					//time++;
 					helper.refresh();
 					continue;
 				}
@@ -62,6 +82,7 @@ class Client {
 				/* home page */
 				if (strCommand == CommandHelper::SIGN_UP) {
 					helper.signUp();
+					//time++;
 					continue;
 				}
 
@@ -100,7 +121,7 @@ class Client {
 					helper.createAccount();
 					continue;
 				}
-
+				
 				if (strCommand == CommandHelper::LIST) {
 					helper.list();
 					continue;
@@ -114,6 +135,23 @@ class Client {
 				if (strCommand == CommandHelper::LOGOUT) {
 					helper.logout();
 					continue;
+				}
+				
+				}
+				//printf("check\n");
+
+				if(FD_ISSET(connFd, &working_set)){
+					//fprintf(stderr,"receive input\n");
+					int fd = connFd;
+					char fromUserName[64] , message[256];
+					int fromUserNameLen, messageLen ;
+					recv(fd, &fromUserNameLen, sizeof(int),0);
+					recv(fd, fromUserName, fromUserNameLen,0);
+					recv(fd, &messageLen, sizeof(int),0);
+					recv(fd, message, messageLen,0);
+					fromUserName[fromUserNameLen] = '\0';
+					message[messageLen] = '\0' ;
+					fprintf(stderr,"\033[31m\033[1m%s\033[0m => %s\n",fromUserName, message);
 				}
 			}
 		}

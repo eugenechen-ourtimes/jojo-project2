@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <assert.h>
 #include "SignUpUtils.hpp"
-
+#include <iostream>
 using namespace std;
 
 /* { OPT_STRING, "text", &textFileName, "text file to disambiguate" } */
@@ -75,6 +75,7 @@ class Server {
 				void handleLogin(int connFd);
 				void handleLogout(int connFd);
 				void handleListUsers(int connFd);
+				void handleSendMessage(int connFd);
 		};
 
 		void init() {
@@ -128,6 +129,7 @@ class Server {
 		void addConnection();
 		void removeUserFromOnlineList(int connFd);
 		void checkConnections(CommandHandler &handler);
+		void save_history(string fromUserName, string targetUserName, string message ); 
 };
 
 
@@ -212,6 +214,9 @@ void Server::checkConnections(CommandHandler &handler)
 					return;
 				case ::listUsers:
 					handler.handleListUsers(connFd);
+					return;
+				case ::sendMessage:
+					handler.handleSendMessage(connFd);
 					return;
 			}
 		}
@@ -460,7 +465,7 @@ void Server::CommandHandler::handleLogin(int connFd)
 	if (result == Login) {
 		server.states[connFd] = ::ONLINE;
 		server.onlineUsers[string(username)] = connFd;
-		fprintf(stderr, "%s login\n", username);
+		fprintf(stderr, "%s login on %d\n", username, connFd);
 	}
 	send(connFd, &result, sizeof(LoginResult), 0);
 }
@@ -509,4 +514,54 @@ void Server::CommandHandler::handleListUsers(int connFd)
 		send(connFd, &usernameLen, sizeof(int), 0);
 		send(connFd, it->first.c_str(), usernameLen, 0);
 	}
+}
+
+void Server::CommandHandler::handleSendMessage(int connFd)
+{
+	//printf("Handle sending\n");
+	char fromUserName[64], targetUserName[64], message[256];
+	int fromLen, targetLen, messageLen;
+	map < string, int > &onlineUsers = server.onlineUsers;
+
+	recv(connFd, &fromLen, sizeof(int), 0);
+	recv(connFd, fromUserName, fromLen, 0);
+	recv(connFd, &targetLen, sizeof(int), 0);
+	recv(connFd, targetUserName, targetLen, 0);
+	recv(connFd, &messageLen, sizeof(int), 0);
+	recv(connFd, message, messageLen, 0);
+	fromUserName[fromLen] = '\0';
+	targetUserName[targetLen] = '\0';
+	message[messageLen] = '\0' ;
+	int targetFd = onlineUsers[string(targetUserName)];
+	send(targetFd, &fromLen, sizeof(int), 0);
+	send(targetFd, fromUserName, fromLen, 0);
+	send(targetFd, &messageLen, sizeof(int), 0);
+	send(targetFd, message, messageLen, 0);
+	
+	server.save_history(string(fromUserName), string(targetUserName), string(message));
+
+	return ;
+
+}	
+
+void Server::save_history(string fromUserName, string targetUserName, string message)
+{
+	string saveDataPath = "../data/server/" ;
+	string srcUser = saveDataPath + fromUserName ;
+	string dstUser = saveDataPath + targetUserName ;
+
+	FILE *fp1 = fopen(srcUser.c_str(), "w");
+	if(fp1 == NULL){
+		return ;
+	}	
+	fprintf(fp1, "%s %s %s\n", fromUserName.c_str(), targetUserName.c_str(), message.c_str());
+	fclose(fp1);
+
+	FILE *fp2 = fopen(dstUser.c_str(), "w");
+	if(fp2 == NULL){
+		return ;
+	}
+	fprintf(fp2, "%s %s %s\n", fromUserName.c_str(), targetUserName.c_str(), message.c_str());
+	fclose(fp2);
+	return ;
 }

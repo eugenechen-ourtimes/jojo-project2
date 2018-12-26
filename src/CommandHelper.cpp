@@ -25,11 +25,12 @@ class CommandHelper {
 		static const string LIST;		/* list */
 		static const string SEND;		/* send */
 		static const string LOGOUT;		/* logout */
-
+		static const string HISTORY;
 		CommandHelper(int connFd, State state) {
 			username = string("anonymous");
 			this->connFd = connFd;
 			this->state = state;
+
 			showHomePage();
 			signUpHelper.setFd(connFd);
 			memset(storedPassword, '\0', PasswordBuffer);
@@ -66,8 +67,8 @@ class CommandHelper {
 			}
 
 			if (state == ::ONLINE) {
-				fprintf(stderr,"input \033[33m\033[1m \\send [ID] [-m] 'message' \033[0mto send a message to a specific ID. Message transmitting is the default action of \033[33m\033[1m\\send\033[0m, so [-m] is selectively input\n\n");
-	fprintf(stderr,"input \033[33m\033[1m \\send [ID] [-f 'filename'] \033[0mto send a file to a specific ID. Make sure you have -f before the filename\n\n");
+				fprintf(stderr,"input \033[33m\033[1m \\send [-m] [ID] 'message' \033[0mto send a message to a specific ID. Message transmitting is the default action of \033[33m\033[1m\\send\033[0m, so [-m] is optional\n\n");
+	fprintf(stderr,"input \033[33m\033[1m \\send [-f] [ID] 'filename' \033[0mto send a file to a specific ID. Make sure you have -f before the filename\n\n");
 	fprintf(stderr,"input \033[33m\033[1m \\list \033[0mto ask a list of ID which has enrolled on the Chatroom.\n\n");
 	fprintf(stderr,"input \033[33m\033[1m \\logout \033[0mto logout and go back to initial login menu.\n\n");				
 
@@ -406,8 +407,13 @@ class CommandHelper {
 		void send(int ret, string command, string ID, string message)
 		{
 			fprintf(stderr, "handle send\n");
-			if (ret == 3 || command == "-m"){
+			if (ret == 3 ){
 				// message 
+				//printf("4567\n");
+				sendMessage(command, ID);
+			}
+			else if(command == "-m"){
+				//printf("6789\n");
 				sendMessage(ID, message);
 			}
 			else if(command == "-f"){
@@ -425,8 +431,7 @@ class CommandHelper {
 			
 			int targetLen = target.length() ;
                         ::send(connFd, &targetLen, sizeof(int), 0);
-                        ::send(connFd, target.c_str(), targetLen, 0);
-			
+                        ::send(connFd, target.c_str(), targetLen, 0);	
 			int messageLen = message.length() ;
                         ::send(connFd, &messageLen, sizeof(int), 0);
                         ::send(connFd, message.c_str(), messageLen, 0);
@@ -437,7 +442,7 @@ class CommandHelper {
 		void logout()
 		{
 			Command command = ::logout ;
-            assert(::send(connFd, &command, sizeof(int), 0) == sizeof(int));
+            		assert(::send(connFd, &command, sizeof(int), 0) == sizeof(int));
 			int usernameLen = username.length();
 			assert(::send(connFd, &usernameLen, sizeof(int), 0) == sizeof(int));
 			assert(::send(connFd, username.c_str(), usernameLen, 0) == usernameLen);
@@ -451,7 +456,10 @@ class CommandHelper {
 			}
 		}
 
-
+		State getState()
+		{
+			return state;
+		}
 		
 	private:
 		char storedPassword[PasswordBuffer];
@@ -507,3 +515,4 @@ const string CommandHelper::CREATE_ACCOUNT = "\\create-account";
 const string CommandHelper::LIST = "\\list";
 const string CommandHelper::SEND = "\\send";
 const string CommandHelper::LOGOUT = "\\logout";
+const string CommandHelper::HISTORY = "\\history"; 
