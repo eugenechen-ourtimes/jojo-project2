@@ -442,7 +442,7 @@ class CommandHelper {
 		void logout()
 		{
 			Command command = ::logout ;
-            		assert(::send(connFd, &command, sizeof(int), 0) == sizeof(int));
+            assert(::send(connFd, &command, sizeof(int), 0) == sizeof(int));
 			int usernameLen = username.length();
 			assert(::send(connFd, &usernameLen, sizeof(int), 0) == sizeof(int));
 			assert(::send(connFd, username.c_str(), usernameLen, 0) == usernameLen);
@@ -453,6 +453,31 @@ class CommandHelper {
 				refresh();
 			} else {
 				fprintf(stderr, "username incorrect\n");
+			}
+		}
+
+		void history()
+		{
+			Command command = ::history ;
+			assert(::send(connFd, &command, sizeof(int), 0) == sizeof(int));
+			int usernameLen = username.length();
+			::send(connFd, &usernameLen, sizeof(int), 0);
+			::send(connFd, username.c_str(), usernameLen, 0);
+
+			int lineCount = -1;
+			char line[1000];
+			char fromUserName[64];
+			char targetUserName[64];
+			char message[256];
+
+			::recv(connFd, &lineCount, sizeof(int), 0);
+			while(lineCount--) {
+				int L = -1;
+				recv(connFd, &L, sizeof(int), 0);
+				recv(connFd, line, L, 0);
+				line[L] = '\0';
+				sscanf(line, "%s%s%s", fromUserName, targetUserName, message);
+				fprintf(stderr, "\033[36m\033[1m%s\033[0m => \033[36m\033[1m%s\033[0m %s\n", fromUserName, targetUserName, message);
 			}
 		}
 

@@ -17,7 +17,8 @@ enum Command
 	sendMessage = 0x07,
 	sendFile = 0x08,
 	logout = 0x09,
-	listUsers = 0x0a
+	listUsers = 0x0a,
+	history = 0x0b
 };
 
 #endif

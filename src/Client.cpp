@@ -136,6 +136,11 @@ class Client {
 					helper.logout();
 					continue;
 				}
+
+				if (strCommand == CommandHelper::HISTORY) {
+					helper.history();
+					continue;
+				}
 				
 				}
 				//printf("check\n");

@@ -18,6 +18,7 @@
 #include <map>
 #include <string>
 #include <algorithm>
+#include <queue>
 #include <assert.h>
 #include "SignUpUtils.hpp"
 #include <iostream>
@@ -45,7 +46,7 @@ class Server {
 		static const int maxConnection = 256;
 		static const int maxLoginUsers = 30;
 		
-
+		static const string historyFolder;
 		static const string usersFileName;
 		FILE *usersFile;
 
@@ -76,6 +77,7 @@ class Server {
 				void handleLogout(int connFd);
 				void handleListUsers(int connFd);
 				void handleSendMessage(int connFd);
+				void handleHistoryRequest(int connFd);
 		};
 
 		void init() {
@@ -129,13 +131,14 @@ class Server {
 		void addConnection();
 		void removeUserFromOnlineList(int connFd);
 		void checkConnections(CommandHandler &handler);
-		void save_history(string fromUserName, string targetUserName, string message ); 
+		void saveHistory(string fromUserName, string targetUserName, string message ); 
 };
 
 
 
 
 const string Server::usersFileName = "../data/server/user.txt";
+const string Server::historyFolder = "../data/server/";
 
 
 
@@ -217,6 +220,9 @@ void Server::checkConnections(CommandHandler &handler)
 					return;
 				case ::sendMessage:
 					handler.handleSendMessage(connFd);
+					return;
+				case ::history:
+					handler.handleHistoryRequest(connFd);
 					return;
 			}
 		}
@@ -538,30 +544,66 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 	send(targetFd, &messageLen, sizeof(int), 0);
 	send(targetFd, message, messageLen, 0);
 	
-	server.save_history(string(fromUserName), string(targetUserName), string(message));
+	server.saveHistory(string(fromUserName), string(targetUserName), string(message));
 
 	return ;
 
 }	
 
-void Server::save_history(string fromUserName, string targetUserName, string message)
+void Server::saveHistory(string fromUserName, string targetUserName, string message)
 {
-	string saveDataPath = "../data/server/" ;
-	string srcUser = saveDataPath + fromUserName ;
-	string dstUser = saveDataPath + targetUserName ;
+	string srcUser = historyFolder + fromUserName ;
+	string dstUser = historyFolder + targetUserName ;
 
-	FILE *fp1 = fopen(srcUser.c_str(), "w");
+	FILE *fp1 = fopen(srcUser.c_str(), "a");
 	if(fp1 == NULL){
 		return ;
 	}	
 	fprintf(fp1, "%s %s %s\n", fromUserName.c_str(), targetUserName.c_str(), message.c_str());
 	fclose(fp1);
 
-	FILE *fp2 = fopen(dstUser.c_str(), "w");
+	FILE *fp2 = fopen(dstUser.c_str(), "a");
 	if(fp2 == NULL){
 		return ;
 	}
 	fprintf(fp2, "%s %s %s\n", fromUserName.c_str(), targetUserName.c_str(), message.c_str());
 	fclose(fp2);
 	return ;
+}
+
+void Server::CommandHandler::handleHistoryRequest(int connFd)
+{
+	char username[64];
+	int usernameLen = -1;
+	recv(connFd, &usernameLen, sizeof(int), 0);
+	recv(connFd, username, usernameLen, 0);
+	username[usernameLen] = '\0';
+	string userHistoryPath = historyFolder + string(username);
+	FILE *fp = fopen(userHistoryPath.c_str(), "r");
+	
+	char line[1024];
+	int lineCount;
+	if (fp == NULL) {
+		lineCount = 0;
+		send(connFd, &lineCount, sizeof(int), 0);
+		return;
+	}
+
+	queue < string > history;
+	while (fgets(line, 1024, fp) != NULL) {
+		history.push(string(line));
+	}
+
+	fclose(fp);
+
+	lineCount = history.size();
+	send(connFd, &lineCount, sizeof(int), 0);
+
+	while (lineCount--) {
+		string front = history.front();
+		history.pop();
+		int L = front.length();
+		send(connFd, &L, sizeof(int), 0);
+		send(connFd, front.c_str(), L, 0);
+	}
 }
