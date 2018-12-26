@@ -46,8 +46,10 @@ class Server {
 		static const int maxConnection = 256;
 		static const int maxLoginUsers = 30;
 		
-		static const string historyFolder;
 		static const string usersFileName;
+		static const string historyFolder;
+		static const string offlineFolder;
+
 		FILE *usersFile;
 
 		fd_set readFds, copy;
@@ -126,19 +128,20 @@ class Server {
 		}
 
 	private:
-		inline State getStateByFd(int connFd);
 		unsigned getMaxFd();
 		void addConnection();
 		void removeUserFromOnlineList(int connFd);
 		void checkConnections(CommandHandler &handler);
-		void saveHistory(string fromUserName, string targetUserName, string message ); 
+		void saveHistory(string fromUserName, string targetUserName, string message);
+		void sendOfflineMessage(string username); 
 };
 
 
 
 
-const string Server::usersFileName = "../data/server/user.txt";
+const string Server::usersFileName = "../data/users/user.txt";
 const string Server::historyFolder = "../data/server/";
+const string Server::offlineFolder = "../data/offline/";
 
 
 
@@ -176,7 +179,7 @@ void Server::checkConnections(CommandHandler &handler)
 			int ret = recv(connFd, &command, sizeof(int), 0);
 			if (ret == 0) {
 				/* connection close */
-				if (getStateByFd(connFd) == ::ONLINE)
+				if (states[connFd] == ::ONLINE)
 					removeUserFromOnlineList(connFd);
 				/* remove states */
 				states.erase(connFd);
@@ -311,13 +314,6 @@ void Server::addConnection()
 	states[connFd] = ::HOME;
 }
 
-inline State Server::getStateByFd(int connFd)
-{
-	map < int, State >::iterator it = states.find(connFd);
-	if (it == states.end()) fprintf(stderr, "error\n");
-	return (it->second);
-}
-
 unsigned Server::getMaxFd()
 {
 	if (connections.empty()) return listenFd;
@@ -337,7 +333,7 @@ void Server::CommandHandler::handleSignUpRequest(int connFd)
 
 void Server::CommandHandler::checkUsernameTaken(int connFd)
 {
-	char username[20];
+	char username[64];
 	int usernameLen = -1;
 	recv(connFd, &usernameLen, sizeof(int), 0);
 	recv(connFd, username, usernameLen, 0);
@@ -354,7 +350,7 @@ void Server::CommandHandler::createAccount(int connFd)
 
 	map < int, State > &states = server.states;
 
-	char username[20];
+	char username[64];
 	char password[256];
 	int usernameLen = -1;
 	recv(connFd, &usernameLen, sizeof(int), 0);
@@ -455,7 +451,7 @@ void Server::CommandHandler::handleLogin(int connFd)
 		if (string(password) != it->second) 
 			result = PasswordIncorrect;
 		else {
-			if (states.find(connFd)->second == ::ONLINE)
+			if (states[connFd] == ::ONLINE)
 				result = AlreadyOnline;
 			else {
 				if (onlineUsers.find(string(username)) != onlineUsers.end())
@@ -468,17 +464,18 @@ void Server::CommandHandler::handleLogin(int connFd)
 		}
 	}
 
+	send(connFd, &result, sizeof(LoginResult), 0);
 	if (result == Login) {
 		server.states[connFd] = ::ONLINE;
 		server.onlineUsers[string(username)] = connFd;
 		fprintf(stderr, "%s login on %d\n", username, connFd);
+		server.sendOfflineMessage(string(username));
 	}
-	send(connFd, &result, sizeof(LoginResult), 0);
 }
 
 void Server::CommandHandler::handleLogout(int connFd)
 {
-	char username[20];
+	char username[64];
 	int usernameLen = -1;
 	recv(connFd, &usernameLen, sizeof(int), 0);
 	recv(connFd, username, usernameLen, 0);
@@ -487,8 +484,8 @@ void Server::CommandHandler::handleLogout(int connFd)
 	map < int, State >  &states = server.states;
 	map < string, int >::iterator it = onlineUsers.find(string(username));
 	bool ack = true;
-	assert(states.find(connFd) != states.end());
-	if (states.find(connFd)->second == ONLINE) {
+
+	if (states[connFd] == ::ONLINE) {
 		if (it == onlineUsers.end() || it->second != connFd)
 			ack = false;
 	}
@@ -505,7 +502,7 @@ void Server::CommandHandler::handleListUsers(int connFd)
 {
 	/* only allow when state is ::ONLINE */
 	map < int, State >  &states = server.states;
-	bool permit = states.find(connFd)->second == ::ONLINE;
+	bool permit = states[connFd] == ::ONLINE;
 	send(connFd, &permit, sizeof(bool), 0);
 	if (!permit) return;
 	
@@ -524,7 +521,6 @@ void Server::CommandHandler::handleListUsers(int connFd)
 
 void Server::CommandHandler::handleSendMessage(int connFd)
 {
-	//printf("Handle sending\n");
 	char fromUserName[64], targetUserName[64], message[256];
 	int fromLen, targetLen, messageLen;
 	map < string, int > &onlineUsers = server.onlineUsers;
@@ -538,16 +534,27 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 	fromUserName[fromLen] = '\0';
 	targetUserName[targetLen] = '\0';
 	message[messageLen] = '\0' ;
-	int targetFd = onlineUsers[string(targetUserName)];
-	send(targetFd, &fromLen, sizeof(int), 0);
-	send(targetFd, fromUserName, fromLen, 0);
-	send(targetFd, &messageLen, sizeof(int), 0);
-	send(targetFd, message, messageLen, 0);
+	map < string, int >::iterator it = onlineUsers.find(string(targetUserName));
+
+	if (it != onlineUsers.end()) {
+		int targetFd = it->second;
+		send(targetFd, &fromLen, sizeof(int), 0);
+		send(targetFd, fromUserName, fromLen, 0);
+		send(targetFd, &messageLen, sizeof(int), 0);
+		send(targetFd, message, messageLen, 0);
+	} else {
+		string offlineMessagePath = offlineFolder + string(targetUserName);
+		FILE *fp = fopen(offlineMessagePath.c_str(), "a");
+		if (fp == NULL) {
+			perror(offlineMessagePath.c_str());
+			return;
+		}
+
+		fprintf(fp, "%s %s\n", fromUserName, message);
+		fclose(fp);
+	}
 	
 	server.saveHistory(string(fromUserName), string(targetUserName), string(message));
-
-	return ;
-
 }	
 
 void Server::saveHistory(string fromUserName, string targetUserName, string message)
@@ -556,19 +563,23 @@ void Server::saveHistory(string fromUserName, string targetUserName, string mess
 	string dstUser = historyFolder + targetUserName ;
 
 	FILE *fp1 = fopen(srcUser.c_str(), "a");
-	if(fp1 == NULL){
-		return ;
+	if (fp1 == NULL) {
+		perror(srcUser.c_str());
+		return;
 	}	
+	
 	fprintf(fp1, "%s %s %s\n", fromUserName.c_str(), targetUserName.c_str(), message.c_str());
 	fclose(fp1);
 
 	FILE *fp2 = fopen(dstUser.c_str(), "a");
-	if(fp2 == NULL){
-		return ;
+	if (fp2 == NULL) {
+		perror(dstUser.c_str());
+		return;
 	}
+
 	fprintf(fp2, "%s %s %s\n", fromUserName.c_str(), targetUserName.c_str(), message.c_str());
 	fclose(fp2);
-	return ;
+	return;
 }
 
 void Server::CommandHandler::handleHistoryRequest(int connFd)
@@ -606,4 +617,40 @@ void Server::CommandHandler::handleHistoryRequest(int connFd)
 		send(connFd, &L, sizeof(int), 0);
 		send(connFd, front.c_str(), L, 0);
 	}
+}
+
+void Server::sendOfflineMessage(string username)
+{
+	string offlineMessagePath = offlineFolder + username;
+	FILE *fp = fopen(offlineMessagePath.c_str(), "r");
+	if (fp == NULL) return;
+
+	int connFd = onlineUsers[username];
+	char fromUserName[64];
+	char message[256];
+
+	queue < string > offlineFrom;
+	queue < string > offlineMessage;
+	while (fscanf(fp, "%s%s", fromUserName, message) != EOF) {
+		offlineFrom.push(string(fromUserName));
+		offlineMessage.push(string(message));
+	}
+
+	fclose(fp);
+
+	int size = offlineFrom.size();
+	while (size--) {
+		string f1 = offlineFrom.front();
+		string f2 = offlineMessage.front();
+		offlineFrom.pop(); offlineMessage.pop();
+
+		int f1Len = f1.length(); int f2Len = f2.length();
+		send(connFd, &f1Len, sizeof(int), 0);
+		send(connFd, f1.c_str(), f1Len, 0);
+
+		send(connFd, &f2Len, sizeof(int), 0);
+		send(connFd, f2.c_str(), f2Len, 0);
+	}
+
+	unlink(offlineMessagePath.c_str());
 }

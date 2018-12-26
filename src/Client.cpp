@@ -45,19 +45,19 @@ class Client {
 			int time = 1;
 			
 			fd_set read_set;
-			fd_set working_set ;
+			fd_set working_set;
 			FD_ZERO(&read_set);
 			FD_ZERO(&working_set);
 			FD_SET(connFd, &read_set);
 			FD_SET(STDIN_FILENO, &read_set);
-			//select(connFd, &read_set)
+
 			while (1) {
 
 				memcpy(&working_set, &read_set, sizeof(fd_set) );
 				select(connFd + 1 , &working_set, NULL, NULL, NULL);
 				//fprintf(stderr, "> ");
 				
-				if(FD_ISSET(STDIN_FILENO, &working_set)){
+				if (FD_ISSET(STDIN_FILENO, &working_set)) {
 
 				fprintf(stderr, "> ");
 				fgets(line, 1000, stdin);
@@ -68,13 +68,11 @@ class Client {
 				string strCommand(arg0);
 
 				if (strCommand == CommandHelper::HELP) {
-					//time++;
 					helper.help();
 					continue;
 				}
 
 				if (strCommand == CommandHelper::REFRESH) {
-					//time++;
 					helper.refresh();
 					continue;
 				}
@@ -82,7 +80,6 @@ class Client {
 				/* home page */
 				if (strCommand == CommandHelper::SIGN_UP) {
 					helper.signUp();
-					//time++;
 					continue;
 				}
 
@@ -143,9 +140,8 @@ class Client {
 				}
 				
 				}
-				//printf("check\n");
 
-				if(FD_ISSET(connFd, &working_set)){
+				if (FD_ISSET(connFd, &working_set)) {
 					//fprintf(stderr,"receive input\n");
 					int fd = connFd;
 					char fromUserName[64] , message[256];
