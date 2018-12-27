@@ -478,7 +478,7 @@ void Server::CommandHandler::handleLogout(int connFd)
 	char username[64];
 	int usernameLen = -1;
 	recv(connFd, &usernameLen, sizeof(int), 0);
-	
+
 	if (usernameLen > 0) {
 		recv(connFd, username, usernameLen, 0);
 		username[usernameLen] = '\0';
@@ -544,6 +544,8 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 
 	if (it != onlineUsers.end()) {
 		int targetFd = it->second;
+		int numOfMessage = 1;
+		send(targetFd, &numOfMessage, sizeof(int), 0);
 		send(targetFd, &fromLen, sizeof(int), 0);
 		send(targetFd, fromUserName, fromLen, 0);
 		send(targetFd, &messageLen, sizeof(int), 0);
@@ -616,7 +618,7 @@ void Server::CommandHandler::handleHistoryRequest(int connFd)
 	lineCount = history.size();
 	send(connFd, &lineCount, sizeof(int), 0);
 
-	while (lineCount--) {
+	while (!history.empty()) {
 		string front = history.front();
 		history.pop();
 		int L = front.length();
@@ -635,20 +637,20 @@ void Server::sendOfflineMessage(string username)
 	char fromUserName[64];
 	char message[256];
 
-	queue < string > offlineFrom;
-	queue < string > offlineMessage;
+	queue < pair < string, string > > offline;
 	while (fscanf(fp, "%s%s", fromUserName, message) != EOF) {
-		offlineFrom.push(string(fromUserName));
-		offlineMessage.push(string(message));
+		offline.push( pair< string, string > (string(fromUserName), string(message)) );
 	}
 
 	fclose(fp);
 
-	int size = offlineFrom.size();
-	while (size--) {
-		string f1 = offlineFrom.front();
-		string f2 = offlineMessage.front();
-		offlineFrom.pop(); offlineMessage.pop();
+	int size = offline.size();
+	send(connFd, &size, sizeof(int), 0);
+
+	while (!offline.empty()) {
+		string f1 = offline.front().first;
+		string f2 = offline.front().second;
+		offline.pop();
 
 		int f1Len = f1.length(); int f2Len = f2.length();
 		send(connFd, &f1Len, sizeof(int), 0);

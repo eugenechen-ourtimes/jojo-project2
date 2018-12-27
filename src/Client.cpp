@@ -182,19 +182,24 @@ class Client {
 
 		void handleDataFromServer(int fd)
 		{
+			int numOfMessage = -1;
 			char fromUserName[64] , message[256];
 			int fromUserNameLen, messageLen ;
-			int ret = recv(fd, &fromUserNameLen, sizeof(int),0);
+			int ret = recv(fd, &numOfMessage, sizeof(int), 0);
 			if (ret == 0) {
 				fprintf(stderr, "server disconnected\n");
 				exit(0);
 			}
-			recv(fd, fromUserName, fromUserNameLen,0);
-			recv(fd, &messageLen, sizeof(int),0);
-			recv(fd, message, messageLen,0);
-			fromUserName[fromUserNameLen] = '\0';
-			message[messageLen] = '\0' ;
-			fprintf(stderr,"\033[31m\033[1m%s\033[0m => %s\n",fromUserName, message);
+
+			while (numOfMessage--) {
+				recv(fd, &fromUserNameLen, sizeof(int), 0);
+				recv(fd, fromUserName, fromUserNameLen, 0);
+				recv(fd, &messageLen, sizeof(int), 0);
+				recv(fd, message, messageLen, 0);
+				fromUserName[fromUserNameLen] = '\0';
+				message[messageLen] = '\0' ;
+				fprintf(stderr, "\033[31m\033[1m%s\033[0m => %s\n", fromUserName, message);
+			}
 		}
 
 	private:
