@@ -23,138 +23,178 @@ static Option options[] = {
 
 class Client {
 	public:
+		static const State nowstate = ::HOME;
 		SocketAddr remote;
 		int connFd;
-		State nowstate = ::HOME;
+
 		Client() {
 			connFd = connect();
 			if (connFd < 0) exit(-1);
 		}
+
 		Client(string host, unsigned port) {
 			remote = SocketAddr(host, port);
 			*this = Client();
 		}
+
 		void run()
 		{
 			CommandHelper helper(connFd, nowstate);
-			char line[1000];
-			char arg0[1000];
-			char arg1[1000];
-			char arg2[1000];
-			char arg3[1000];
-			int time = 1;
 			
 			fd_set read_set;
 			fd_set working_set;
 			FD_ZERO(&read_set);
-			FD_ZERO(&working_set);
 			FD_SET(connFd, &read_set);
 			FD_SET(STDIN_FILENO, &read_set);
+
+			fprintf(stderr, "> ");
 
 			while (1) {
 
 				memcpy(&working_set, &read_set, sizeof(fd_set) );
 				select(connFd + 1 , &working_set, NULL, NULL, NULL);
-				//fprintf(stderr, "> ");
 				
 				if (FD_ISSET(STDIN_FILENO, &working_set)) {
-
-				fprintf(stderr, "> ");
-				fgets(line, 1000, stdin);
-				
-				int ret = sscanf(line, "%s%s%s%s", arg0, arg1, arg2, arg3);
-				
-				if (ret <= 0) continue;
-				string strCommand(arg0);
-
-				if (strCommand == CommandHelper::HELP) {
-					helper.help();
+					handleStdin(helper);
+					fprintf(stderr, "> ");
 					continue;
-				}
-
-				if (strCommand == CommandHelper::REFRESH) {
-					helper.refresh();
-					continue;
-				}
-
-				/* home page */
-				if (strCommand == CommandHelper::SIGN_UP) {
-					helper.signUp();
-					continue;
-				}
-
-				if (strCommand == CommandHelper::LOGIN) {
-					helper.login();
-					continue;
-				}
-
-				if (strCommand == CommandHelper::QUIT) {
-					helper.quit();
-					continue;
-				}
-
-				/* sign-up page */
-				if (strCommand == CommandHelper::USERNAME) {
-					helper.setUsername((ret == 2) ? string(arg1): "");
-					continue;
-				}
-
-				if (strCommand == CommandHelper::PASSWORD) {
-					helper.setPassword();
-					continue;
-				}
-
-				if (strCommand == CommandHelper::CONFIRM_PASSWORD) {
-					helper.confirmPassword();
-					continue;
-				}
-
-				if (strCommand == CommandHelper::CANCEL) {
-					helper.cancelSignUp();
-					continue;
-				}
-
-				if (strCommand == CommandHelper::CREATE_ACCOUNT) {
-					helper.createAccount();
-					continue;
-				}
-				
-				if (strCommand == CommandHelper::LIST) {
-					helper.list();
-					continue;
-				}
-
-				if (strCommand == CommandHelper::SEND) {
-					helper.send(ret, string(arg1), string(arg2), string(arg3));
-					continue;
-				}
-
-				if (strCommand == CommandHelper::LOGOUT) {
-					helper.logout();
-					continue;
-				}
-
-				if (strCommand == CommandHelper::HISTORY) {
-					helper.history();
-					continue;
-				}
-				
 				}
 
 				if (FD_ISSET(connFd, &working_set)) {
-					//fprintf(stderr,"receive input\n");
-					int fd = connFd;
-					char fromUserName[64] , message[256];
-					int fromUserNameLen, messageLen ;
-					recv(fd, &fromUserNameLen, sizeof(int),0);
-					recv(fd, fromUserName, fromUserNameLen,0);
-					recv(fd, &messageLen, sizeof(int),0);
-					recv(fd, message, messageLen,0);
-					fromUserName[fromUserNameLen] = '\0';
-					message[messageLen] = '\0' ;
-					fprintf(stderr,"\033[31m\033[1m%s\033[0m => %s\n",fromUserName, message);
+					fprintf(stderr, "\n");
+					handleDataFromServer(connFd);
+					fprintf(stderr, "> ");
 				}
 			}
+		}
+
+		void handleStdin(CommandHelper &helper)
+		{
+			static char line[1000];
+			static char arg0[1000];
+			static char arg1[1000];
+			static char arg2[1000];
+			static char arg3[1000];
+
+			fgets(line, 1000, stdin);
+			
+			int ret = sscanf(line, "%s%s%s%s", arg0, arg1, arg2, arg3);
+			
+			if (ret <= 0) return;
+			string strCommand(arg0);
+
+			if (strCommand == CommandHelper::HELP) {
+				helper.help();
+				return;
+			}
+
+			if (strCommand == CommandHelper::REFRESH) {
+				helper.refresh();
+				return;
+			}
+
+			/* home page */
+			if (strCommand == CommandHelper::SIGN_UP) {
+				helper.signUp();
+				return;
+			}
+
+			if (strCommand == CommandHelper::LOGIN) {
+				helper.login();
+				return;
+			}
+
+			if (strCommand == CommandHelper::QUIT) {
+				helper.quit();
+				return;
+			}
+
+			/* sign-up page */
+			if (strCommand == CommandHelper::USERNAME) {
+				if (ret == 1) {
+					fprintf(stderr, "missing input string\n");
+					return;
+				}
+
+				helper.inputUsername(string(arg1));
+				return;
+			}
+
+			if (strCommand == CommandHelper::PASSWORD) {
+				helper.inputPassword();
+				return;
+			}
+
+			if (strCommand == CommandHelper::CONFIRM_PASSWORD) {
+				helper.confirmPassword();
+				return;
+			}
+
+			if (strCommand == CommandHelper::CANCEL) {
+				helper.cancelSignUp();
+				return;
+			}
+
+			if (strCommand == CommandHelper::CREATE_ACCOUNT) {
+				helper.createAccount();
+				return;
+			}
+			
+			if (strCommand == CommandHelper::LIST) {
+				helper.list();
+				return;
+			}
+
+			if (strCommand == CommandHelper::SEND) {
+				/*	send	-m/-f	username	message/filename
+					arg0	arg1	arg2		arg3
+
+					send	username	message
+					arg0	arg1		arg2	
+
+					sendData(option, targetUserName, content) */
+
+				if (ret < 3) {
+					/* TODO: modify this sentence */
+					fprintf(stderr, "Usage: send [-m / -f] username message\n");
+					return;
+				}
+
+				if (ret == 3) {
+					helper.sendData("-m", string(arg1), string(arg2));
+					return;
+				}
+
+				helper.sendData(string(arg1), string(arg2), string(arg3));
+				return;
+			}
+
+			if (strCommand == CommandHelper::LOGOUT) {
+				helper.logout();
+				return;
+			}
+
+			if (strCommand == CommandHelper::HISTORY) {
+				helper.history();
+				return;
+			}
+		}
+
+		void handleDataFromServer(int fd)
+		{
+			char fromUserName[64] , message[256];
+			int fromUserNameLen, messageLen ;
+			int ret = recv(fd, &fromUserNameLen, sizeof(int),0);
+			if (ret == 0) {
+				fprintf(stderr, "server disconnected\n");
+				exit(0);
+			}
+			recv(fd, fromUserName, fromUserNameLen,0);
+			recv(fd, &messageLen, sizeof(int),0);
+			recv(fd, message, messageLen,0);
+			fromUserName[fromUserNameLen] = '\0';
+			message[messageLen] = '\0' ;
+			fprintf(stderr,"\033[31m\033[1m%s\033[0m => %s\n",fromUserName, message);
 		}
 
 	private:

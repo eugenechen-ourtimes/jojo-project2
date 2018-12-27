@@ -26,14 +26,14 @@ class CommandHelper {
 		static const string SEND;		/* send */
 		static const string LOGOUT;		/* logout */
 		static const string HISTORY;
-		CommandHelper(int connFd, State state) {
-			username = string("anonymous");
-			this->connFd = connFd;
-			this->state = state;
 
-			showHomePage();
+		CommandHelper(int connFd, State state) {
+			this->connFd = connFd;
+			setState(state);
 			signUpHelper.setFd(connFd);
 			memset(storedPassword, '\0', PasswordBuffer);
+
+			showHomePage();
 		}
 
 		void help()
@@ -113,8 +113,8 @@ class CommandHelper {
 
 			Command command = ::signUp;
 			bool permit;
-			::send(connFd, &command, sizeof(int), 0);
-			::recv(connFd, &permit, sizeof(bool), 0);
+			send(connFd, &command, sizeof(int), 0);
+			recv(connFd, &permit, sizeof(bool), 0);
 			if (permit) {
 				state = ::REGISTER;
 				fprintf(stderr, "entering sign-up page ...\n%s\n", del);
@@ -164,20 +164,20 @@ class CommandHelper {
 			
 			Command command = ::login;
 
-			::send(connFd, &command, sizeof(int), 0);
+			send(connFd, &command, sizeof(int), 0);
 			int IDLen = strlen(ID);
 			int passwordLen = strlen(password) ;
-			::send(connFd, &IDLen, sizeof(int), 0);
-			::send(connFd, ID, IDLen, 0);
-			::send(connFd, &passwordLen, sizeof(int), 0);
-			::send(connFd, password, passwordLen, 0);
+			send(connFd, &IDLen, sizeof(int), 0);
+			send(connFd, ID, IDLen, 0);
+			send(connFd, &passwordLen, sizeof(int), 0);
+			send(connFd, password, passwordLen, 0);
 			LoginResult result = Uninitialized;
 			recv(connFd, &result, sizeof(int), 0);
 
 			if (result == Login) {
 				fprintf(stderr, GRN "=> login successful\n" RESET);
-				username = string(ID);
-				state = ::ONLINE;
+				setUsername(string(ID));
+				setState(::ONLINE);
 				if (!passwordFileAccessible) {
 					savePassword(savedPasswordPath.c_str(), password);
 				}
@@ -217,7 +217,7 @@ class CommandHelper {
 				return;
 			}
 
-			fprintf(stderr, "server seems disconnected\n");
+			fprintf(stderr, "server disconnected\n");
 		}
 
 		void savePassword(string path, char *password)
@@ -255,27 +255,23 @@ class CommandHelper {
 
 			Command command = ::quit;
 			bool ack = false;
-			::send(connFd, &command, sizeof(int), 0);
-			::recv(connFd, &ack, sizeof(bool), 0);
+			send(connFd, &command, sizeof(int), 0);
+			recv(connFd, &ack, sizeof(bool), 0);
 			if (ack) exit(0);
 		}
 
-		void setUsername(string arg)
+		void inputUsername(string arg)
 		{
 			if (state != ::REGISTER) {
 				promptStateIncorrect();
 				return;
 			}
 
-			if (arg.empty()) {
-				fprintf(stderr, "missing input string\n");
-				return;
-			}
 			signUpHelper.handleInputUsername(arg);
 			signUpHelper.refresh();
 		}
 
-		void setPassword()
+		void inputPassword()
 		{
 			if (state != ::REGISTER) {
 				promptStateIncorrect();
@@ -322,7 +318,7 @@ class CommandHelper {
 				promptStateIncorrect();
 				return;
 			}
-			state = ::HOME;
+			setState(::HOME);
 			signUpHelper.cancel();
 			promptReturningToHomePage();
 			showHomePage();
@@ -356,7 +352,7 @@ class CommandHelper {
 			if (result == FullAccount) {
 				fprintf(stderr, "rejected (full account)\n");
 				promptReturningToHomePage();
-				state = ::HOME;
+				setState(::HOME);
 				signUpHelper.reset();
 				showHomePage();
 				return;
@@ -370,7 +366,7 @@ class CommandHelper {
 			if (result == OK) {
 				fprintf(stderr, "create account success\n");
 				promptReturningToHomePage();
-				state = ::HOME;
+				setState(::HOME);
 				signUpHelper.reset();
 				showHomePage();
 				return;
@@ -382,74 +378,76 @@ class CommandHelper {
 		void list()
 		{
 			Command command = ::listUsers ;
-			::send(connFd, &command, sizeof(int), 0);
+			send(connFd, &command, sizeof(int), 0);
 			int size;
 			bool permit = false;
-			::recv(connFd, &permit, sizeof(bool), 0);
+			recv(connFd, &permit, sizeof(bool), 0);
 			if (!permit) {
 				fprintf(stderr, "list request rejected (state is not ONLINE)\n");
 				return;
 			}
 
-			::recv(connFd, &size, sizeof(int), 0);
+			recv(connFd, &size, sizeof(int), 0);
 			fprintf(stderr, "\033[32m\033[1m\033[45menrolled users:\033[0m\n\n");
-			while(size--){
+			while (size--) {
 				int usernameLen ;
 				char username[32] ;
-				::recv(connFd, &usernameLen, sizeof(int), 0);
-				::recv(connFd, username, usernameLen, 0);
+				recv(connFd, &usernameLen, sizeof(int), 0);
+				recv(connFd, username, usernameLen, 0);
 				username[usernameLen] = '\0' ;
 				fprintf(stderr,"* %s\n",username);
 			}
-			return ;
 		}
 
-		void send(int ret, string command, string ID, string message)
+		void sendData(string option, string targetUserName, string content)
 		{
-			fprintf(stderr, "handle send\n");
-			if (ret == 3 ){
-				// message 
-				//printf("4567\n");
-				sendMessage(command, ID);
-			}
-			else if(command == "-m"){
-				//printf("6789\n");
-				sendMessage(ID, message);
-			}
-			else if(command == "-f"){
-				// file X
+			if (option == "-m") {
+				sendMessage(targetUserName, content);
+			} else {
+				if (option == "-f") {
+					sendFile(targetUserName, content);
+				} else {
+					fprintf(stderr, "Unknown option %s\n", option.c_str());
+				}
 			}
 		}
 		
-		void sendMessage(string target, string message){
+		void sendMessage(string target, string message) {
 			Command command = ::sendMessage ;
-			::send(connFd, &command, sizeof(int), 0);
+			send(connFd, &command, sizeof(int), 0);
 
 			int usernameLen = username.length() ;
-                        ::send(connFd, &usernameLen, sizeof(int), 0);
-                        ::send(connFd, username.c_str(), usernameLen, 0);
+                        send(connFd, &usernameLen, sizeof(int), 0);
+                        send(connFd, username.c_str(), usernameLen, 0);
 			
 			int targetLen = target.length() ;
-                        ::send(connFd, &targetLen, sizeof(int), 0);
-                        ::send(connFd, target.c_str(), targetLen, 0);	
+                        send(connFd, &targetLen, sizeof(int), 0);
+                        send(connFd, target.c_str(), targetLen, 0);	
 			int messageLen = message.length() ;
-                        ::send(connFd, &messageLen, sizeof(int), 0);
-                        ::send(connFd, message.c_str(), messageLen, 0);
+                        send(connFd, &messageLen, sizeof(int), 0);
+                        send(connFd, message.c_str(), messageLen, 0);
 			
-			return ;
+			return;
+		}
+
+		void sendFile(string target, string fileName)
+		{
+			fprintf(stderr, "handle send file\n");
 		}
 
 		void logout()
 		{
 			Command command = ::logout ;
-            assert(::send(connFd, &command, sizeof(int), 0) == sizeof(int));
+            assert(send(connFd, &command, sizeof(int), 0) == sizeof(int));
 			int usernameLen = username.length();
-			assert(::send(connFd, &usernameLen, sizeof(int), 0) == sizeof(int));
-			assert(::send(connFd, username.c_str(), usernameLen, 0) == usernameLen);
+			assert(send(connFd, &usernameLen, sizeof(int), 0) == sizeof(int));
+			if (usernameLen > 0)
+				assert(send(connFd, username.c_str(), usernameLen, 0) == usernameLen);
 			bool ack = true;
-			::recv(connFd, &ack, sizeof(bool), 0);
+			recv(connFd, &ack, sizeof(bool), 0);
 			if (ack) {
-				state = ::HOME;
+				setState(::HOME);
+				setUsername("");
 				refresh();
 			} else {
 				fprintf(stderr, "username incorrect\n");
@@ -459,10 +457,10 @@ class CommandHelper {
 		void history()
 		{
 			Command command = ::history ;
-			assert(::send(connFd, &command, sizeof(int), 0) == sizeof(int));
+			assert(send(connFd, &command, sizeof(int), 0) == sizeof(int));
 			int usernameLen = username.length();
-			::send(connFd, &usernameLen, sizeof(int), 0);
-			::send(connFd, username.c_str(), usernameLen, 0);
+			send(connFd, &usernameLen, sizeof(int), 0);
+			send(connFd, username.c_str(), usernameLen, 0);
 
 			int lineCount = -1;
 			char line[1000];
@@ -470,8 +468,8 @@ class CommandHelper {
 			char targetUserName[64];
 			char message[256];
 
-			::recv(connFd, &lineCount, sizeof(int), 0);
-			while(lineCount--) {
+			recv(connFd, &lineCount, sizeof(int), 0);
+			while (lineCount--) {
 				int L = -1;
 				recv(connFd, &L, sizeof(int), 0);
 				recv(connFd, line, L, 0);
@@ -481,9 +479,24 @@ class CommandHelper {
 			}
 		}
 
+		void setState(State state)
+		{
+			this->state = state;
+		}
+
 		State getState()
 		{
 			return state;
+		}
+
+		void setUsername(string username)
+		{
+			this->username = username;
+		}
+
+		string getUsername()
+		{
+			return username;
 		}
 		
 	private:

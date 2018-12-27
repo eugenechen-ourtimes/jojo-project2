@@ -478,8 +478,14 @@ void Server::CommandHandler::handleLogout(int connFd)
 	char username[64];
 	int usernameLen = -1;
 	recv(connFd, &usernameLen, sizeof(int), 0);
-	recv(connFd, username, usernameLen, 0);
-	username[usernameLen] = '\0';
+	
+	if (usernameLen > 0) {
+		recv(connFd, username, usernameLen, 0);
+		username[usernameLen] = '\0';
+	} else {
+		strcpy(username, "[anonymous]");
+	}
+
 	map < string, int > &onlineUsers = server.onlineUsers;
 	map < int, State >  &states = server.states;
 	map < string, int >::iterator it = onlineUsers.find(string(username));
