@@ -184,7 +184,9 @@ class Client {
 		{
 			int numOfMessage = -1;
 			char fromUserName[64] , message[256];
-			int fromUserNameLen, messageLen ;
+			char time_cstr[32];
+			int fromUserNameLen, messageLen;
+			int time_len;
 			int ret = recv(fd, &numOfMessage, sizeof(int), 0);
 			if (ret == 0) {
 				fprintf(stderr, "server disconnected\n");
@@ -196,9 +198,12 @@ class Client {
 				recv(fd, fromUserName, fromUserNameLen, 0);
 				recv(fd, &messageLen, sizeof(int), 0);
 				recv(fd, message, messageLen, 0);
+				recv(fd, &time_len, sizeof(int), 0);
+				recv(fd, time_cstr, time_len, 0);
 				fromUserName[fromUserNameLen] = '\0';
 				message[messageLen] = '\0' ;
-				fprintf(stderr, "\033[31m\033[1m%s\033[0m => %s\n", fromUserName, message);
+				time_cstr[time_len] = '\0';
+				fprintf(stderr, "\033[31m\033[1m%s\033[0m => %s\t%s\n", fromUserName, message, time_cstr);
 			}
 		}
 
@@ -235,7 +240,7 @@ class Client {
 				return -2;
 			}
 
-    		return -3;
+			return -3;
 		}
 };
 

@@ -136,7 +136,7 @@ class CommandHelper {
 			char line[64];
 			char ID[32];
 			fgets(line, 64, stdin);
-			sscanf(line, "%s", ID); 
+			sscanf(line, "%s", ID);
 			if(!strcmp(ID,"\\return")){
 				refresh() ;
 				return  ;
@@ -467,6 +467,7 @@ class CommandHelper {
 			char fromUserName[64];
 			char targetUserName[64];
 			char message[256];
+			char time_cstr[32];
 
 			recv(connFd, &lineCount, sizeof(int), 0);
 			while (lineCount--) {
@@ -474,8 +475,8 @@ class CommandHelper {
 				recv(connFd, &L, sizeof(int), 0);
 				recv(connFd, line, L, 0);
 				line[L] = '\0';
-				sscanf(line, "%s%s%s", fromUserName, targetUserName, message);
-				fprintf(stderr, "\033[36m\033[1m%s\033[0m => \033[36m\033[1m%s\033[0m %s\n", fromUserName, targetUserName, message);
+				sscanf(line, "%s%s%s%s", fromUserName, targetUserName, message, time_cstr);
+				fprintf(stderr, "\033[36m\033[1m%s\033[0m => \033[36m\033[1m%s\033[0m %s\t%s\n", fromUserName, targetUserName, message, time_cstr);
 			}
 		}
 

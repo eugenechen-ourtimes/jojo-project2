@@ -1,3 +1,4 @@
+#include "TimeUtils.hpp"
 #include "option.h"
 #include "Command.hpp"
 #include "State.hpp"
@@ -22,6 +23,7 @@
 #include <assert.h>
 #include "SignUpUtils.hpp"
 #include <iostream>
+#include <tuple>
 using namespace std;
 
 /* { OPT_STRING, "text", &textFileName, "text file to disambiguate" } */
@@ -29,6 +31,8 @@ using namespace std;
 static Option options[] = {
 	{ OPT_UINT, "port", &port, "port number"}
 };
+
+char TimeUtils::time_cstr[32] = "";
 
 template<typename KeyType, typename ValueType> 
 pair<KeyType,ValueType> maxValue(const map<KeyType,ValueType> &x)
@@ -132,7 +136,7 @@ class Server {
 		void addConnection();
 		void removeUserFromOnlineList(int connFd);
 		void checkConnections(CommandHandler &handler);
-		void saveHistory(string fromUserName, string targetUserName, string message);
+		void saveHistory(string fromUserName, string targetUserName, string message, string timeStr);
 		void sendOfflineMessage(string username); 
 };
 
@@ -542,14 +546,27 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 	message[messageLen] = '\0' ;
 	map < string, int >::iterator it = onlineUsers.find(string(targetUserName));
 
+	char *time_cstr = TimeUtils::get_time_cstr(time(NULL));
+	if (time_cstr == NULL) {
+		TimeUtils::showError();
+		return;
+	}
+
+	int time_len = strlen(time_cstr);
+
 	if (it != onlineUsers.end()) {
 		int targetFd = it->second;
 		int numOfMessage = 1;
+
 		send(targetFd, &numOfMessage, sizeof(int), 0);
+
 		send(targetFd, &fromLen, sizeof(int), 0);
 		send(targetFd, fromUserName, fromLen, 0);
 		send(targetFd, &messageLen, sizeof(int), 0);
 		send(targetFd, message, messageLen, 0);
+
+		send(targetFd, &time_len, sizeof(int), 0);
+		send(targetFd, time_cstr, time_len, 0);
 	} else {
 		string offlineMessagePath = offlineFolder + string(targetUserName);
 		FILE *fp = fopen(offlineMessagePath.c_str(), "a");
@@ -558,14 +575,20 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 			return;
 		}
 
-		fprintf(fp, "%s %s\n", fromUserName, message);
+		fprintf(fp, "%s %s\t%s\n", fromUserName, message, time_cstr);
 		fclose(fp);
 	}
 	
-	server.saveHistory(string(fromUserName), string(targetUserName), string(message));
+	server.saveHistory
+	(
+		string(fromUserName),
+		string(targetUserName),
+		string(message),
+		string(time_cstr)
+	);
 }	
 
-void Server::saveHistory(string fromUserName, string targetUserName, string message)
+void Server::saveHistory(string fromUserName, string targetUserName, string message, string timeStr)
 {
 	string srcUser = historyFolder + fromUserName ;
 	string dstUser = historyFolder + targetUserName ;
@@ -576,7 +599,13 @@ void Server::saveHistory(string fromUserName, string targetUserName, string mess
 		return;
 	}	
 	
-	fprintf(fp1, "%s %s %s\n", fromUserName.c_str(), targetUserName.c_str(), message.c_str());
+	fprintf(fp1, "%s %s %s\t%s\n",
+		fromUserName.c_str(),
+		targetUserName.c_str(),
+		message.c_str(),
+		timeStr.c_str()
+		);
+
 	fclose(fp1);
 
 	FILE *fp2 = fopen(dstUser.c_str(), "a");
@@ -585,9 +614,14 @@ void Server::saveHistory(string fromUserName, string targetUserName, string mess
 		return;
 	}
 
-	fprintf(fp2, "%s %s %s\n", fromUserName.c_str(), targetUserName.c_str(), message.c_str());
+	fprintf(fp2, "%s %s %s\t%s\n",
+		fromUserName.c_str(),
+		targetUserName.c_str(),
+		message.c_str(),
+		timeStr.c_str()
+		);
+
 	fclose(fp2);
-	return;
 }
 
 void Server::CommandHandler::handleHistoryRequest(int connFd)
@@ -636,10 +670,20 @@ void Server::sendOfflineMessage(string username)
 	int connFd = onlineUsers[username];
 	char fromUserName[64];
 	char message[256];
+	char time_cstr[32];
 
-	queue < pair < string, string > > offline;
-	while (fscanf(fp, "%s%s", fromUserName, message) != EOF) {
-		offline.push( pair< string, string > (string(fromUserName), string(message)) );
+	queue < tuple < string, string, string > > offline;
+
+	while (fscanf(fp, "%s%s%s", fromUserName, message, time_cstr) != EOF) {
+		offline.push
+		(
+			tuple < string, string, string>
+			(
+				string(fromUserName),
+				string(message),
+				string(time_cstr)
+			)
+		);
 	}
 
 	fclose(fp);
@@ -648,16 +692,21 @@ void Server::sendOfflineMessage(string username)
 	send(connFd, &size, sizeof(int), 0);
 
 	while (!offline.empty()) {
-		string f1 = offline.front().first;
-		string f2 = offline.front().second;
+		tuple < string, string, string > front = offline.front();
+		string f1 = get<0> (front);
+		string f2 = get<1> (front);
+		string f3 = get<2> (front);
 		offline.pop();
 
-		int f1Len = f1.length(); int f2Len = f2.length();
+		int f1Len = f1.length(); int f2Len = f2.length(); int f3Len = f3.length();
 		send(connFd, &f1Len, sizeof(int), 0);
 		send(connFd, f1.c_str(), f1Len, 0);
 
 		send(connFd, &f2Len, sizeof(int), 0);
 		send(connFd, f2.c_str(), f2Len, 0);
+
+		send(connFd, &f3Len, sizeof(int), 0);
+		send(connFd, f3.c_str(), f3Len, 0);
 	}
 
 	unlink(offlineMessagePath.c_str());
