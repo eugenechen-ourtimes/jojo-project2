@@ -401,6 +401,11 @@ class CommandHelper {
 
 		void sendData(string option, string targetUserName, string content)
 		{
+			if (state != ::ONLINE) {
+				promptStateIncorrect();
+				return;
+			}
+
 			if (option == "-m") {
 				sendMessage(targetUserName, content);
 			} else {
@@ -413,31 +418,45 @@ class CommandHelper {
 		}
 		
 		void sendMessage(string target, string message) {
-			Command command = ::sendMessage ;
+			Command command = ::sendMessage;
 			send(connFd, &command, sizeof(int), 0);
 
-			int usernameLen = username.length() ;
-                        send(connFd, &usernameLen, sizeof(int), 0);
-                        send(connFd, username.c_str(), usernameLen, 0);
+			int usernameLen = username.length();
+			int targetLen = target.length();
+			int messageLen = message.length();
+
+			send(connFd, &usernameLen, sizeof(int), 0);
+			send(connFd, username.c_str(), usernameLen, 0);
 			
-			int targetLen = target.length() ;
-                        send(connFd, &targetLen, sizeof(int), 0);
-                        send(connFd, target.c_str(), targetLen, 0);	
-			int messageLen = message.length() ;
-                        send(connFd, &messageLen, sizeof(int), 0);
-                        send(connFd, message.c_str(), messageLen, 0);
-			
-			return;
+			send(connFd, &targetLen, sizeof(int), 0);
+			send(connFd, target.c_str(), targetLen, 0);
+
+			send(connFd, &messageLen, sizeof(int), 0);
+			send(connFd, message.c_str(), messageLen, 0);
 		}
 
 		void sendFile(string target, string fileName)
 		{
-			fprintf(stderr, "handle send file\n");
+			Command command = ::sendFile;
+			send(connFd, &command, sizeof(int), 0);
+
+			int usernameLen = username.length();
+			int targetLen = target.length();
+			int fileNameLen = fileName.length();
+
+			send(connFd, &usernameLen, sizeof(int), 0);
+			send(connFd, username.c_str(), usernameLen, 0);
+			
+			send(connFd, &targetLen, sizeof(int), 0);
+			send(connFd, target.c_str(), targetLen, 0);
+
+			send(connFd, &fileNameLen, sizeof(int), 0);
+			send(connFd, fileName.c_str(), fileNameLen, 0);
 		}
 
 		void logout()
 		{
-			Command command = ::logout ;
+			Command command = ::logout;
             assert(send(connFd, &command, sizeof(int), 0) == sizeof(int));
 			int usernameLen = username.length();
 			assert(send(connFd, &usernameLen, sizeof(int), 0) == sizeof(int));
@@ -466,17 +485,39 @@ class CommandHelper {
 			char line[1000];
 			char fromUserName[64];
 			char targetUserName[64];
-			char message[256];
+			char content[256];
 			char time_cstr[32];
+			int type;
 
 			recv(connFd, &lineCount, sizeof(int), 0);
+			const char *color = "\033[36m\033[1m";
 			while (lineCount--) {
 				int L = -1;
 				recv(connFd, &L, sizeof(int), 0);
 				recv(connFd, line, L, 0);
 				line[L] = '\0';
-				sscanf(line, "%s%s%s%s", fromUserName, targetUserName, message, time_cstr);
-				fprintf(stderr, "\033[36m\033[1m%s\033[0m => \033[36m\033[1m%s\033[0m %s\t%s\n", fromUserName, targetUserName, message, time_cstr);
+				
+				type = Zero;
+				
+				sscanf(line, "%s%s%s%d%s", fromUserName, targetUserName, content, &type, time_cstr);
+				if (type != Message && type != File) {
+					fprintf(stderr, "Unknown type %d\n", type);
+					continue;
+				}
+				
+				int isFile = (type == File) ? 1: 0;
+
+				fprintf(stderr, "%s%s%s %s %s%s%s %s\t%s\n",
+					color,
+					fromUserName,
+					reset,
+					arrow[isFile],
+					color,
+					targetUserName,
+					reset,
+					content,
+					time_cstr
+				);
 			}
 		}
 

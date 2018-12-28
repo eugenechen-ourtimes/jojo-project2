@@ -1,4 +1,6 @@
 const char *del = "--------------------";
+const char *reset = "\033[0m";
+const char *arrow[2] = {"=>", "->"};
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -13,6 +15,7 @@ using namespace std;
 #include "SocketAddr.cpp"
 #include "State.hpp"
 #include "Command.hpp"
+#include "DataType.hpp"
 #include "CommandHelper.cpp"
 #include <sys/select.h>
 
@@ -182,28 +185,52 @@ class Client {
 
 		void handleDataFromServer(int fd)
 		{
-			int numOfMessage = -1;
-			char fromUserName[64] , message[256];
+			int numOfLines = -1;
+			char fromUserName[64], content[256];
 			char time_cstr[32];
-			int fromUserNameLen, messageLen;
+			int fromUserNameLen, contentLen;
 			int time_len;
-			int ret = recv(fd, &numOfMessage, sizeof(int), 0);
+
+			int type = Zero;
+			int ret = recv(fd, &numOfLines, sizeof(int), 0);
 			if (ret == 0) {
 				fprintf(stderr, "server disconnected\n");
 				exit(0);
 			}
 
-			while (numOfMessage--) {
+			while (numOfLines--) {
 				recv(fd, &fromUserNameLen, sizeof(int), 0);
 				recv(fd, fromUserName, fromUserNameLen, 0);
-				recv(fd, &messageLen, sizeof(int), 0);
-				recv(fd, message, messageLen, 0);
+
+				recv(fd, &contentLen, sizeof(int), 0);
+				recv(fd, content, contentLen, 0);
+
+				recv(fd, &type, sizeof(int), 0);
+
 				recv(fd, &time_len, sizeof(int), 0);
 				recv(fd, time_cstr, time_len, 0);
+
+				if (type != Message && type != File) {
+					fprintf(stderr, "Unknown type %d\n", type);
+					continue;
+				}
+
 				fromUserName[fromUserNameLen] = '\0';
-				message[messageLen] = '\0' ;
+				content[contentLen] = '\0';
 				time_cstr[time_len] = '\0';
-				fprintf(stderr, "\033[31m\033[1m%s\033[0m => %s\t%s\n", fromUserName, message, time_cstr);
+
+				int isFile = (type == File) ? 1: 0;
+
+				const char *color = "\033[31m\033[1m";
+				
+				fprintf(stderr, "%s%s%s %s %s\t%s\n",
+					color,
+					fromUserName,
+					reset,
+					arrow[isFile],
+					content,
+					time_cstr
+				);
 			}
 		}
 
