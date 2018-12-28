@@ -10,7 +10,7 @@ class CommandHelper {
 	public:
 		static const string strEmpty;	/* [Empty] */
 		static const string strHidden;  /* [Hidden] */
-		static const string savedPasswordFolder; /* ../data/client/ */
+		static const string savedPasswordFolder; /* ../data/client/pass/ */
 
 		static const string HELP;		/* help */
 		static const string REFRESH;	/* refresh */
@@ -580,7 +580,7 @@ class CommandHelper {
 
 const string CommandHelper::strEmpty = "[Empty]";
 const string CommandHelper::strHidden = "[Hidden]";
-const string CommandHelper::savedPasswordFolder = "../data/client/";
+const string CommandHelper::savedPasswordFolder = "../data/client/pass/";
 
 const string CommandHelper::HELP = "\\help";
 const string CommandHelper::REFRESH = "\\refresh";
