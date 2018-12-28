@@ -4,7 +4,11 @@
 #include "SignUpHelper.hpp"
 #include <assert.h>
 #include <ctype.h>
+#include <libgen.h>
+#include <stdint.h>
+#include "common.hpp"
 #define PasswordBuffer 1024
+
 
 class CommandHelper {
 	public:
@@ -427,7 +431,7 @@ class CommandHelper {
 
 			send(connFd, &usernameLen, sizeof(int), 0);
 			send(connFd, username.c_str(), usernameLen, 0);
-			
+
 			send(connFd, &targetLen, sizeof(int), 0);
 			send(connFd, target.c_str(), targetLen, 0);
 
@@ -435,14 +439,51 @@ class CommandHelper {
 			send(connFd, message.c_str(), messageLen, 0);
 		}
 
-		void sendFile(string target, string fileName)
+		void sendFile(string target, string arg)
 		{
+			int pathLen = arg.length();
+			char *path = (char *)malloc(pathLen);
+			strcpy(path, arg.c_str());
+
+			FILE *fp = fopen(path, "rb");
+			if (fp == NULL) {
+				perror(path);
+				free(path);
+				return;
+			}
+
+			fseek(fp, 0L, SEEK_END);
+			size_t sz = ftell(fp);
+
+			if (sz > 20 * MB) {
+				fprintf(stderr, "%s: file size too large ... no more than 20 MB.\n", path);
+				fclose(fp);
+				free(path);
+				return;
+			}
+
+			rewind(fp);
+
+			char *ts1 = strdup(path);
+			char *ts2 = strdup(path);
+
+			if (ts1 == NULL || ts2 == NULL) {
+				fprintf(stderr, "strdup error\n");
+				if (ts1 != NULL) free(ts1);
+				if (ts2 != NULL) free(ts2);
+				free(path);
+				return;
+			}
+
+			char *dir = dirname(ts1);
+			char *filename = basename(ts2);
+			int filenameLen = strlen(filename);
+
 			Command command = ::sendFile;
 			send(connFd, &command, sizeof(int), 0);
 
 			int usernameLen = username.length();
 			int targetLen = target.length();
-			int fileNameLen = fileName.length();
 
 			send(connFd, &usernameLen, sizeof(int), 0);
 			send(connFd, username.c_str(), usernameLen, 0);
@@ -450,8 +491,23 @@ class CommandHelper {
 			send(connFd, &targetLen, sizeof(int), 0);
 			send(connFd, target.c_str(), targetLen, 0);
 
-			send(connFd, &fileNameLen, sizeof(int), 0);
-			send(connFd, fileName.c_str(), fileNameLen, 0);
+			send(connFd, &filenameLen, sizeof(int), 0);
+			send(connFd, filename, filenameLen, 0);
+
+			char buf[IOBufSize];
+			int32_t size;
+
+			send(connFd, &sz, sizeof(size_t), 0);
+
+			while (sz != 0) {
+				size = (sz < IOBufSize) ? sz: IOBufSize;
+				fread(buf, 1, size, fp);
+				send(connFd, &size, 4, 0);
+				send(connFd, buf, size, 0);
+				sz -= size;
+			}
+
+			fclose(fp); free(path); free(ts1); free(ts2);
 		}
 
 		void logout()

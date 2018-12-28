@@ -6,6 +6,8 @@
 #include "LoginResult.hpp"
 #include "DataType.hpp"
 
+#include <stdint.h>
+#include <sys/stat.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -23,8 +25,10 @@
 #include <queue>
 #include <assert.h>
 #include "SignUpUtils.hpp"
+#include "common.hpp"
 #include <iostream>
 #include <tuple>
+#include <dirent.h>
 using namespace std;
 
 /* { OPT_STRING, "text", &textFileName, "text file to disambiguate" } */
@@ -667,6 +671,44 @@ void Server::CommandHandler::handleSendFile(int connFd)
 		type,
 		string(time_cstr)
 	);
+
+	string targetUserDownloadFolder = fileUploadFolder + string(targetUserName) + "/";
+	DIR *dir = opendir(targetUserDownloadFolder.c_str());
+	if (dir == NULL) {
+		int ret = mkdir(targetUserDownloadFolder.c_str(), 0700);
+		if (ret < 0) {
+			perror(targetUserDownloadFolder.c_str());
+			exit(-1);
+		}
+	}
+
+	string path = targetUserDownloadFolder + string(fileName);
+	FILE *fp = fopen(path.c_str(), "w");
+
+	if (fp == NULL) {
+		perror(path.c_str());
+		exit(-1);
+	}
+
+	size_t sz = 0;
+	recv(connFd, &sz, sizeof(size_t), 0);
+
+	if (sz > 20 * MB) {
+		fprintf(stderr, "%s: file size too large!\n", fileName);
+		return;
+	}
+
+	int32_t _sz = sz;
+	int32_t size;
+	char buf[IOBufSize];
+	while (_sz > 0) {
+		recv(connFd, &size, 4, 0);
+		recv(connFd, buf, size, 0);
+		fwrite(buf, 1, size, fp);
+		_sz -= size;
+	}
+
+	fclose(fp);
 }
 
 void Server::saveHistory
