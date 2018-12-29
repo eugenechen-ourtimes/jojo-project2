@@ -91,6 +91,7 @@ class Server {
 				void handleSendMessage(int connFd);
 				void handleSendFile(int connFd);
 				void handleHistoryRequest(int connFd);
+				void handleDownloadRequest(int connFd);
 		};
 
 		void init() {
@@ -248,6 +249,9 @@ void Server::checkConnections(CommandHandler &handler)
 					return;
 				case ::history:
 					handler.handleHistoryRequest(connFd);
+					return;
+				case ::download:
+					handler.handleDownloadRequest(connFd);
 					return;
 			}
 		}
@@ -847,4 +851,57 @@ void Server::sendOfflineData(string username)
 	}
 
 	unlink(offlineContentPath.c_str());
+}
+
+void Server::CommandHandler::handleDownloadRequest(int connFd)
+{
+
+	char username[64], filename[64] ;
+	int usernameLen, filenameLen ;
+
+	recv(connFd, &usernameLen, sizeof(int), 0);
+	recv(connFd, username, usernameLen, 0);
+	recv(connFd, &filenameLen, sizeof(int), 0);
+	recv(connFd, filename, filenameLen, 0);
+	username[usernameLen] = '\0';
+	filename[filenameLen] = '\0';
+	
+	int permit = 0;
+	string targetUserDownloadFolder = fileUploadFolder + string(username) + "/";
+	cout << targetUserDownloadFolder << '\n' ;
+	DIR *dir = opendir(targetUserDownloadFolder.c_str());
+	if (dir == NULL) {
+		send(connFd, &permit, sizeof(int), 0);
+		return ;
+	}
+
+	string path = targetUserDownloadFolder + string(filename);
+	FILE *fp = fopen(path.c_str(), "rb");
+
+	if (fp == NULL) {
+		send(connFd, &permit, sizeof(int), 0);
+		return ;
+	}
+	permit = 1;
+	send(connFd, &permit, sizeof(int), 0);
+	cout << path << '\n' ;
+
+	char buf[IOBufSize];
+	int32_t size;
+	fseek(fp, 0L, SEEK_END);
+	size_t sz = ftell(fp);
+	printf("%zu\n", sz);
+	rewind(fp);
+
+	send(connFd, &sz, sizeof(size_t), 0);
+
+	while (sz != 0) {
+		size = (sz < IOBufSize) ? sz: IOBufSize;
+		fread(buf, 1, size, fp);
+		send(connFd, &size, 4, 0);
+		send(connFd, buf, size, 0);
+		sz -= size;
+	}
+	fclose(fp);
+	return ;
 }

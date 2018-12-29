@@ -6,7 +6,11 @@
 #include <ctype.h>
 #include <libgen.h>
 #include <stdint.h>
+#include <vector>
 #include "common.hpp"
+#include <dirent.h>
+#include <sys/stat.h>
+#include <iostream>
 #define PasswordBuffer 1024
 
 
@@ -30,7 +34,10 @@ class CommandHelper {
 		static const string SEND;		/* send */
 		static const string LOGOUT;		/* logout */
 		static const string HISTORY;
+		static const string DOWNLOAD;
+		static const string DOWNLOADLIST;
 
+		//vector < string > downloadList ;
 		CommandHelper(int connFd, State state) {
 			this->connFd = connFd;
 			setState(state);
@@ -42,31 +49,26 @@ class CommandHelper {
 
 		void help()
 		{
-			fprintf(stderr, "available commands:\n");
-			fprintf(stderr, "** help [-a]\n"
-							"      Dispay this help\n");
-			fprintf(stderr, "** refresh\n"
-							"      Refresh your web page\n");
+			fprintf(stderr, "\033[33m\033[1m\\refresh\033[0m to refresh your web page\n");
 			showLocalCommands();
 		}
 
 		void showLocalCommands()
 		{
 			if (state == ::HOME) {
-				fprintf(stderr, "** \\sign-up\n");
-				fprintf(stderr, "** \\login\n");
-				fprintf(stderr, "** \\quit\n");
-
+				fprintf(stderr, "input \033[33m\033[1m\\sign-up\033[0m to enter the signup page.\n\n");
+				fprintf(stderr, "input \033[33m\033[1m\\login\033[0m to login.\n\n");
+				fprintf(stderr, "input \033[33m\033[1m\\quit\033[0m to leave the application.\n\n");
 				return;
 			}
 
 			if (state == ::REGISTER) {
-				fprintf(stderr, "** \\username [username]\n");
-				fprintf(stderr, "** \\password\n");
-				fprintf(stderr, "** \\confirm-password\n");
-				fprintf(stderr, "** \\cancel\n"
-								"      Cancel sign up\n");
-				fprintf(stderr, "** \\create-account\n");
+				fprintf(stderr, "input \033[33m\033[1m\\username [username]\033[0m to register account with the username.\n\n");
+				fprintf(stderr, "input \033[33m\033[1m\\password\033[0m to set the password. To execute this instruction, the username must be set.\n\n");
+
+				fprintf(stderr, "input \033[33m\033[1m\\confirm-password\033[0m to confirm the password. Password should be set before.\n\n");
+				fprintf(stderr, "input \033[33m\033[1m\\cancel\033[0m to cancel sign up and return to previous page.\n\n");
+				fprintf(stderr, "input \033[33m\033[1m\\create-account\033[0m you can create the account successfully if username, password, confirm-password had been correctly set.\n\n");
 				return;
 			}
 
@@ -74,6 +76,9 @@ class CommandHelper {
 				fprintf(stderr,"input \033[33m\033[1m \\send [-m] [ID] 'message' \033[0mto send a message to a specific ID. Message transmitting is the default action of \033[33m\033[1m\\send\033[0m, so [-m] is optional\n\n");
 	fprintf(stderr,"input \033[33m\033[1m \\send [-f] [ID] 'filename' \033[0mto send a file to a specific ID. Make sure you have -f before the filename\n\n");
 	fprintf(stderr,"input \033[33m\033[1m \\list \033[0mto ask a list of ID which has enrolled on the Chatroom.\n\n");
+	fprintf(stderr,"input \033[33m\033[1m \\history \033[0mto check previous message.\n\n");	
+	fprintf(stderr,"input \033[33m\033[1m \\download-list \033[0mto check the files available for downloading.\n\n");
+	fprintf(stderr,"input \033[33m\033[1m \\download [filename]\033[0mto download the corresponding file.\n\n");
 	fprintf(stderr,"input \033[33m\033[1m \\logout \033[0mto logout and go back to initial login menu.\n\n");				
 
 				/*
@@ -102,7 +107,7 @@ class CommandHelper {
 				showOnlinePage();
 				return ;
 			}
-
+			
 			fprintf(stderr, "refresh chat room\n");
 			/* TODO question: how do we refresh in chat room ? */
 
@@ -591,6 +596,105 @@ class CommandHelper {
 		{
 			this->username = username;
 		}
+		
+		void download(int ret, string arg) {
+			//Command command = ::DOWNLOADPAGE;
+			if (state != ::ONLINE) {				
+				promptStateIncorrect();
+				return ;
+			}
+			if (ret != 2) {
+				fprintf(stderr,"format error! \033[33m\033[1m\\download\033[0m should be followed by only one parameter [%s], or you can input \033[33m\033[1m\\help\033[0m to see advanced instruction\n", "%s");
+				return ;
+			}
+			downloadRequest(arg);
+			return;
+		}
+
+
+		void showDownloadList()
+		{
+			string targetDownloadPath = "../data/client/download/";
+			string targetDownloadFolder = targetDownloadPath + username + "/";
+			DIR *dir = opendir(targetDownloadFolder.c_str());
+			if (dir == NULL) {
+				fprintf(stderr,"No available file for downloading.\n");
+				return;
+			}
+			string targetDownloadList = targetDownloadFolder + "downloadList" ;
+			FILE *fp = fopen(targetDownloadList.c_str(), "r");
+			if (fp == NULL) {
+				fprintf(stderr,"No available file for downloading.\n");
+				return;
+			}
+			fprintf(stderr,"\ninput \033[33m\033[1m\\download [%s]\033[0m to require downloading a file.\n","%s");
+			
+			char line[64];
+			char name[64];
+			int index = 0;
+			while (fgets(line, 64, fp)) {
+				sscanf(line, "%s", name);
+				if (index % 6 == 0) {
+					fprintf(stderr,"\n\033[33m\033[1m%s\033[0m    ",name);
+				}
+				else {
+					fprintf(stderr,"\033[33m\033[1m%s\033[0m    ",name);
+				}
+				index++;
+			}
+			fprintf(stderr,"\n");
+			return;
+		}
+
+
+
+		void downloadRequest(string filename) {
+			fprintf(stderr,"file requiring\n");
+						
+			Command command = ::download;
+			assert(send(connFd, &command, sizeof(int), 0) == sizeof(int));
+			int usernameLen = username.length(), filenameLen = filename.length();
+			
+			send(connFd, &usernameLen, sizeof(int), 0);
+			send(connFd, username.c_str(), usernameLen, 0);
+			send(connFd, &filenameLen, sizeof(int), 0);
+			send(connFd, filename.c_str(), filenameLen, 0);
+			int permit;
+			recv(connFd, &permit, sizeof(int), 0);
+			if (!permit) {
+				fprintf(stderr,"File not exist.\n");
+				return ;
+			}
+			
+			string targetDownloadPath = "../data/client/download/";
+			string targetDownloadFolder = targetDownloadPath + username + "/";
+					
+			DIR *dir = opendir(targetDownloadFolder.c_str());
+			if (dir == NULL) {
+				int ret = mkdir(targetDownloadFolder.c_str(), 0700);
+				if ( ret < 0 ) {
+					perror(targetDownloadFolder.c_str());
+					exit(-1);
+				}
+			}
+			string targetFile = targetDownloadFolder + filename ;
+			FILE *fp = fopen(targetFile.c_str(), "w");
+
+			size_t sz = 0;
+			recv(connFd, &sz, sizeof(size_t), 0);
+			int32_t _sz = sz;
+			int32_t size;
+			char buf[IOBufSize];
+			while (_sz > 0) {
+				recv(connFd, &size, 4, 0);
+				recv(connFd, buf, size, 0);
+				fwrite(buf, 1, size, fp);
+				_sz -= size;
+			}
+			fclose(fp);
+			return ;
+
+		}
 
 		string getUsername()
 		{
@@ -603,7 +707,8 @@ class CommandHelper {
 		State state;
 		string username;
 		SignUpHelper signUpHelper;
-		
+		//vector < string > downloadList ;
+
 		void promptReturningToHomePage() {
 			fprintf(stderr, "returning to home page ...\n%s\n", del);
 		}
@@ -624,19 +729,21 @@ class CommandHelper {
 			fprintf(stderr,"\t*=                         =*\n");
 			fprintf(stderr,"\t*===========================*\n\n");
 			fprintf(stderr,"\tStart with an instruction\n");
-			fprintf(stderr,"\t\033[33m\033[1m\\login     \\sign-up     \\quit \033[0m\n");
+			fprintf(stderr,"\t\033[33m\033[1m\\login     \\sign-up    \\help    \\quit \033[0m\n");
 		}
 
 		void showOnlinePage()
 		{
 			printf("\n\tHello \033[32m\033[1m\033[5m%s\033[0m >< How are you ?\n", username.c_str());
-			printf("\t\033[33m\033[1m\\send     \\list     \\logout    \\help \033[0m\n");		
+			printf("\t\033[33m\033[1m\\send     \\list     \\history    \\download-list\033[0m\n");		
+			fprintf(stderr,"\t\033[33m\033[1m\\download    \\help    \\logout\033[0m\n");
 		}
 };
 
 const string CommandHelper::strEmpty = "[Empty]";
 const string CommandHelper::strHidden = "[Hidden]";
 const string CommandHelper::savedPasswordFolder = "../data/client/pass/";
+//const string CommandHelper::savedDownloadFolder = "../data/client/download";
 
 const string CommandHelper::HELP = "\\help";
 const string CommandHelper::REFRESH = "\\refresh";
@@ -651,4 +758,6 @@ const string CommandHelper::CREATE_ACCOUNT = "\\create-account";
 const string CommandHelper::LIST = "\\list";
 const string CommandHelper::SEND = "\\send";
 const string CommandHelper::LOGOUT = "\\logout";
-const string CommandHelper::HISTORY = "\\history"; 
+const string CommandHelper::HISTORY = "\\history";
+const string CommandHelper::DOWNLOAD = "\\download";
+const string CommandHelper::DOWNLOADLIST = "\\download-list";

@@ -147,5 +147,5 @@ void SignUpHelper::refresh()
 	}
 
 	fprintf(stderr,"\nStart with an instruction\n");
-	fprintf(stderr,"\033[33m\033[1m\\create-account   \\username [%s]   \\password   \\confirm-password   \\cancel \033[0m\n","%s");
+	fprintf(stderr,"\033[33m\033[1m\\create-account   \\username [%s]   \\password   \\confirm-password   \\help    \\cancel \033[0m\n","%s");
 }

@@ -18,6 +18,8 @@ using namespace std;
 #include "DataType.hpp"
 #include "CommandHelper.cpp"
 #include <sys/select.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 static Option options[] = {
 	{ OPT_STRING, "host", &host, "remote host"},
@@ -65,7 +67,7 @@ class Client {
 
 				if (FD_ISSET(connFd, &working_set)) {
 					fprintf(stderr, "\n");
-					handleDataFromServer(connFd);
+					handleDataFromServer(connFd, helper);
 					fprintf(stderr, "> ");
 				}
 			}
@@ -159,7 +161,7 @@ class Client {
 
 				if (ret < 3) {
 					/* TODO: modify this sentence */
-					fprintf(stderr, "Usage: send [-m / -f] username message\n");
+					fprintf(stderr, "format error! Please input \033[33m\033[1m\\help\033[0m to make sure the format.\n");
 					return;
 				}
 
@@ -181,9 +183,19 @@ class Client {
 				helper.history();
 				return;
 			}
+
+			if (strCommand == CommandHelper::DOWNLOAD){
+				helper.download(ret, arg1);
+				return;
+			}
+
+			if (strCommand == CommandHelper::DOWNLOADLIST){
+				helper.showDownloadList();
+				return ;
+			}
 		}
 
-		void handleDataFromServer(int fd)
+		void handleDataFromServer(int fd, CommandHelper &helper)
 		{
 			int numOfLines = -1;
 			char fromUserName[64], content[256];
@@ -231,6 +243,25 @@ class Client {
 					content,
 					time_cstr
 				);
+				if (isFile) {
+					fprintf(stderr, "Input \033[33m\033[1m\\download [filename]\033[0m to download the file.\n");
+					string targetDownloadPath = "../data/client/download/";
+					string username = helper.getUsername();
+					string targetDownloadFolder = targetDownloadPath + username + "/";
+					
+					DIR *dir = opendir(targetDownloadFolder.c_str());
+					if (dir == NULL) {
+						int ret = mkdir(targetDownloadFolder.c_str(), 0700);
+						if (ret < 0) {
+							perror(targetDownloadFolder.c_str());
+							exit(-1);
+						}
+					}
+					string targetDownloadList = targetDownloadFolder + "downloadList" ;
+					FILE *fp = fopen(targetDownloadList.c_str(), "a");
+					fprintf(fp,"%s\n", content);
+					fclose(fp);
+				}
 			}
 		}
 
