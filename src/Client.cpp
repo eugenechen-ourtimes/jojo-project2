@@ -189,17 +189,17 @@ class Client {
 					helper.promptStateIncorrect();
 					return;
 				}
-				
-				if (ret < 3) {
-					fprintf(stderr,"format error! \033[33m\033[1m\\download\033[0m should be followed by only one parameter [%s], or you can input \033[33m\033[1m\\help\033[0m to see advanced instruction\n", "%s");
+
+				if (ret < 2) {
+					fprintf(stderr, "format error! \033[33m\033[1m\\download\033[0m should be followed by one parameter [%s], or you can input \033[33m\033[1m\\help\033[0m to see advanced instruction\n", "%s");
 					return;
 				}
 
-				helper.download(ret, arg1, arg2);
+				helper.download(arg1, (ret == 2) ? "": arg2);
 				return;
 			}
 
-			if (strCommand == CommandHelper::DOWNLOADLIST){
+			if (strCommand == CommandHelper::DOWNLOADLIST) {
 				helper.showDownloadList();
 				return;
 			}
@@ -256,34 +256,17 @@ class Client {
 					time_cstr
 				);
 
-				if (isFile) hasFile = true;
-
-				/*
 				if (isFile) {
-					fprintf(stderr, "Input \033[33m\033[1m\\download [filename]\033[0m to download the file.\n");
-					string targetDownloadPath = "../data/client/download/";
-					string username = helper.getUsername();
-					string targetDownloadFolder = targetDownloadPath + username + "/";
-					
-					DIR *dir = opendir(targetDownloadFolder.c_str());
-					if (dir == NULL) {
-						int ret = mkdir(targetDownloadFolder.c_str(), 0700);
-						if (ret < 0) {
-							perror(targetDownloadFolder.c_str());
-							exit(-1);
-						}
-					}
-
-					string downloadListPath = CommandHelper::downloadListFolder + helper.getUsername();
-					FILE *fp = fopen(downloadListPath.c_str(), "a");
+					hasFile = true;
+					string path = CommandHelper::downloadListFolder + helper.getUsername();
+					FILE *fp = fopen(path.c_str(), "a");
 					if (fp == NULL) {
-						perror(downloadListPath.c_str());
-						exit(-2);
+						perror(path.c_str());
+						exit(-1);
 					}
-
-					fprintf(fp, "%s\n", content);
+					fprintf(fp, "%s %s\n", content, time_cstr);
 					fclose(fp);
-				} */
+				}
 			}
 
 			if (hasFile) {

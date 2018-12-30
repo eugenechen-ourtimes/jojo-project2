@@ -438,8 +438,22 @@ class CommandHelper {
 			send(connFd, &usernameLen, sizeof(int), 0);
 			send(connFd, username.c_str(), usernameLen, 0);
 
+			bool a1 = false;
+			recv(connFd, &a1, sizeof(bool), 0);
+			if (!a1) {
+				fprintf(stderr, "server says src username incorrect\n");
+				return;
+			}
+
 			send(connFd, &targetLen, sizeof(int), 0);
 			send(connFd, target.c_str(), targetLen, 0);
+
+			bool a2 = false;
+			recv(connFd, &a2, sizeof(bool), 0);
+			if (!a2) {
+				fprintf(stderr, "dst username does not exist\n");
+				return;
+			}
 
 			send(connFd, &messageLen, sizeof(int), 0);
 			send(connFd, message.c_str(), messageLen, 0);
@@ -493,9 +507,25 @@ class CommandHelper {
 
 			send(connFd, &usernameLen, sizeof(int), 0);
 			send(connFd, username.c_str(), usernameLen, 0);
+
+			bool a1 = false;
+			recv(connFd, &a1, sizeof(bool), 0);
+			if (!a1) {
+				fclose(fp); free(path); free(ts1); free(ts2);
+				fprintf(stderr, "server says src username incorrect\n");
+				return;
+			}
 			
 			send(connFd, &targetLen, sizeof(int), 0);
 			send(connFd, target.c_str(), targetLen, 0);
+
+			bool a2 = false;
+			recv(connFd, &a2, sizeof(bool), 0);
+			if (!a2) {
+				fclose(fp); free(path); free(ts1); free(ts2);
+				fprintf(stderr, "dst username does not exist\n");
+				return;
+			}
 
 			send(connFd, &filenameLen, sizeof(int), 0);
 			send(connFd, filename, filenameLen, 0);
@@ -545,11 +575,18 @@ class CommandHelper {
 
 		void history()
 		{
-			Command command = ::history ;
+			Command command = ::history;
 			assert(send(connFd, &command, sizeof(int), 0) == sizeof(int));
 			int usernameLen = username.length();
 			send(connFd, &usernameLen, sizeof(int), 0);
 			send(connFd, username.c_str(), usernameLen, 0);
+
+			bool a1 = false;
+			recv(connFd, &a1, sizeof(bool), 0);
+			if (!a1) {
+				fprintf(stderr, "server says username incorrect\n");
+				return;
+			}
 
 			int lineCount = -1;
 			char line[1000];
@@ -606,7 +643,7 @@ class CommandHelper {
 			this->username = username;
 		}
 		
-		void download(int ret, string arg1, string arg2) {
+		void download(string arg1, string arg2) {
 			//Command command = ::DOWNLOADPAGE;
 			if (state != ::ONLINE) {				
 				promptStateIncorrect();
@@ -620,8 +657,6 @@ class CommandHelper {
 
 		void showDownloadList()
 		{
-			fprintf(stderr, "show download list\n");
-			return;
 			string downloadListPath = downloadListFolder + getUsername();
 			FILE *fp = fopen(downloadListPath.c_str(), "r");
 			if (fp == NULL) {
@@ -631,61 +666,20 @@ class CommandHelper {
 
 			fprintf(stderr,"\ninput \033[33m\033[1m\\download [%s]\033[0m to require downloading a file.\n","%s");
 			
-			char line[64];
 			char name[64];
+			char time_cstr[32];
 			int index = 0;
-			while (fgets(line, sizeof(line), fp)) {
-				sscanf(line, "%s", name);
-				fprintf(stderr, "\033[33m\033[1m%s\033[0m\t\n", name);
-				/*if (index % 6 == 0) {
-					fprintf(stderr,"\n\033[33m\033[1m%s\033[0m    ",name);
-				}
-				else {
-					fprintf(stderr,"\033[33m\033[1m%s\033[0m    ",name);
-				}
-				index++;*/
+			while (fscanf(fp, "%s%s", name, time_cstr) != EOF) {
+				fprintf(stderr, "\033[33m\033[1m%s\033[0m\t%s\n", name, time_cstr);
 			}
 
 			fclose(fp);
-
-			/*
-			string targetDownloadPath = "../data/client/download/";
-			string targetDownloadFolder = targetDownloadPath + username + "/";
-			DIR *dir = opendir(targetDownloadFolder.c_str());
-			if (dir == NULL) {
-				fprintf(stderr,"No available file for downloading.\n");
-				return;
-			}
-			closedir(dir);
-			string targetDownloadList = targetDownloadFolder + "downloadList" ;
-			FILE *fp = fopen(targetDownloadList.c_str(), "r");
-			if (fp == NULL) {
-				fprintf(stderr,"No available file for downloading.\n");
-				return;
-			}
-			fprintf(stderr,"\ninput \033[33m\033[1m\\download [%s]\033[0m to require downloading a file.\n","%s");
-			
-			char line[64];
-			char name[64];
-			int index = 0;
-			while (fgets(line, 64, fp)) {
-				sscanf(line, "%s", name);
-				if (index % 6 == 0) {
-					fprintf(stderr,"\n\033[33m\033[1m%s\033[0m    ",name);
-				}
-				else {
-					fprintf(stderr,"\033[33m\033[1m%s\033[0m    ",name);
-				}
-				index++;
-			}
-			fprintf(stderr,"\n");
-			return;
-			*/
 		}
 
 
 
-		void downloadRequest(string filename, string timeStr) {
+		void downloadRequest(string filename, string timeStr)
+		{
 			fprintf(stderr, "file requesting\n");
 						
 			Command command = ::download;
@@ -694,10 +688,20 @@ class CommandHelper {
 			int timeStrLen = timeStr.length();
 			send(connFd, &usernameLen, sizeof(int), 0);
 			send(connFd, username.c_str(), usernameLen, 0);
+			
+			bool a1 = false;
+			recv(connFd, &a1, sizeof(bool), 0);
+			if (!a1) {
+				fprintf(stderr, "server says username incorrect\n");
+				return;
+			}
+
 			send(connFd, &filenameLen, sizeof(int), 0);
 			send(connFd, filename.c_str(), filenameLen, 0);
+
 			send(connFd, &timeStrLen, sizeof(int), 0);
-			send(connFd, timeStr.c_str(), timeStrLen, 0);
+			if (timeStrLen > 0)
+				send(connFd, timeStr.c_str(), timeStrLen, 0);
 
 
 			int permit;

@@ -558,22 +558,36 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 	char fromUserName[64], targetUserName[64], message[256];
 	int fromLen, targetLen, messageLen;
 	map < string, int > &onlineUsers = server.onlineUsers;
+	map < string, string > &credentials = server.credentials; 
 
 	recv(connFd, &fromLen, sizeof(int), 0);
 	recv(connFd, fromUserName, fromLen, 0);
+	fromUserName[fromLen] = '\0';
+	
+	bool a1 = (connFd == onlineUsers[string(fromUserName)]);
+	send(connFd, &a1, sizeof(bool), 0);
+
+	if (!a1) return;
+
 	recv(connFd, &targetLen, sizeof(int), 0);
 	recv(connFd, targetUserName, targetLen, 0);
+	targetUserName[targetLen] = '\0';
+
+	bool a2 = (credentials.find(string(targetUserName)) != credentials.end());
+	send(connFd, &a2, sizeof(bool), 0);
+	
+	if (!a2) return;
+
 	recv(connFd, &messageLen, sizeof(int), 0);
 	recv(connFd, message, messageLen, 0);
-	fromUserName[fromLen] = '\0';
-	targetUserName[targetLen] = '\0';
+
 	message[messageLen] = '\0';
 	map < string, int >::iterator it = onlineUsers.find(string(targetUserName));
 
 	char *time_cstr = TimeUtils::get_time_cstr(time(NULL));
 	if (time_cstr == NULL) {
 		TimeUtils::showError();
-		return;
+		exit(-1);
 	}
 
 	int time_len = strlen(time_cstr);
@@ -621,15 +635,30 @@ void Server::CommandHandler::handleSendFile(int connFd)
 	char fromUserName[64], targetUserName[64], fileName[256];
 	int fromLen, targetLen, fileNameLen;
 	map < string, int > &onlineUsers = server.onlineUsers;
+	map < string, string > &credentials = server.credentials; 
 
 	recv(connFd, &fromLen, sizeof(int), 0);
 	recv(connFd, fromUserName, fromLen, 0);
+	fromUserName[fromLen] = '\0';
+
+	if (connFd != onlineUsers[string(fromUserName)]) 
+		fprintf(stderr, "Username incorrect, you are not %s!\n", fromUserName);
+
+
+	bool a1 = (connFd == onlineUsers[string(fromUserName)]);
+	send(connFd, &a1, sizeof(bool), 0);
+	if (!a1) return;
+
 	recv(connFd, &targetLen, sizeof(int), 0);
 	recv(connFd, targetUserName, targetLen, 0);
+	targetUserName[targetLen] = '\0';
+
+	bool a2 = (credentials.find(string(targetUserName)) != credentials.end());
+	send(connFd, &a2, sizeof(bool), 0);
+	if (!a2) return;
+
 	recv(connFd, &fileNameLen, sizeof(int), 0);
 	recv(connFd, fileName, fileNameLen, 0);
-	fromUserName[fromLen] = '\0';
-	targetUserName[targetLen] = '\0';
 	fileName[fileNameLen] = '\0';
 	map < string, int >::iterator it = onlineUsers.find(string(targetUserName));
 
@@ -729,8 +758,8 @@ void Server::saveHistory
 	string timeStr
 )
 {
-	string srcUser = historyFolder + fromUserName ;
-	string dstUser = historyFolder + targetUserName ;
+	string srcUser = historyFolder + fromUserName;
+	string dstUser = historyFolder + targetUserName;
 
 	FILE *fp1 = fopen(srcUser.c_str(), "a");
 	if (fp1 == NULL) {
@@ -767,11 +796,17 @@ void Server::saveHistory
 
 void Server::CommandHandler::handleHistoryRequest(int connFd)
 {
+	map < string, int > &onlineUsers = server.onlineUsers;
 	char username[64];
 	int usernameLen = -1;
 	recv(connFd, &usernameLen, sizeof(int), 0);
 	recv(connFd, username, usernameLen, 0);
 	username[usernameLen] = '\0';
+
+	bool a1 = (connFd == onlineUsers[string(username)]);
+	send(connFd, &a1, sizeof(bool), 0);
+	if (!a1) return;
+
 	string userHistoryPath = historyFolder + string(username);
 	FILE *fp = fopen(userHistoryPath.c_str(), "r");
 	
@@ -860,7 +895,7 @@ void Server::sendOfflineData(string username)
 
 void Server::CommandHandler::handleDownloadRequest(int connFd)
 {
-
+	map < string, int > &onlineUsers = server.onlineUsers;
 	char username[64], filename[64];
 	char time_cstr[32];
 	int time_len;
@@ -868,13 +903,21 @@ void Server::CommandHandler::handleDownloadRequest(int connFd)
 
 	recv(connFd, &usernameLen, sizeof(int), 0);
 	recv(connFd, username, usernameLen, 0);
+	username[usernameLen] = '\0';
+
+	bool a1 = (connFd == onlineUsers[string(username)]);
+	send(connFd, &a1, sizeof(bool), 0);
+	if (!a1) return;
+
 	recv(connFd, &filenameLen, sizeof(int), 0);
 	recv(connFd, filename, filenameLen, 0);
-	recv(connFd, &time_len, sizeof(int), 0);
-	recv(connFd, time_cstr, time_len, 0);
-
-	username[usernameLen] = '\0';
 	filename[filenameLen] = '\0';
+
+	recv(connFd, &time_len, sizeof(int), 0);
+
+	if (time_len > 0)
+		recv(connFd, time_cstr, time_len, 0);
+
 	time_cstr[time_len] = '\0';
 	
 	int permit = 0;
@@ -882,7 +925,35 @@ void Server::CommandHandler::handleDownloadRequest(int connFd)
 	
 	fprintf(stderr, "%s\n", downloadFolder.c_str());
 
-	string baseName = string(TimeUtils::encode_time_str(time_cstr)) + del + string(filename);
+	string timeStr;
+	if (time_len > 0) {
+		timeStr = string(TimeUtils::encode_time_str(time_cstr));
+	} else {
+		DIR *dir = opendir(downloadFolder.c_str());
+		if (dir != NULL) {
+			struct dirent *p;
+			string latest;
+			while ((p = readdir(dir)) != NULL) {
+				if (strcmp(p->d_name, ".") == 0 || strcmp(p->d_name, "..") == 0) continue;
+				char *prefix = strtok(p->d_name, del);
+				char *postfix = strtok(NULL, del);
+				if (prefix == NULL || postfix == NULL) {
+					fprintf(stderr, "file format error: %s\n", p->d_name);
+					exit(-1);
+				}
+				fprintf(stderr, "%s %s\n", prefix, postfix);
+				if (strcmp(filename, postfix) == 0 && strcmp(latest.c_str(), prefix) < 0) 
+					latest = string(prefix);
+			}
+			closedir(dir);
+			if (!latest.empty()) timeStr = latest;
+		}
+		
+		if (timeStr.empty())
+			fprintf(stderr, "no such file or directory %s/%s\n", username, filename);
+	}
+
+	string baseName = timeStr + del + string(filename);
 	string path = downloadFolder + baseName;
 	FILE *fp = fopen(path.c_str(), "rb");
 
