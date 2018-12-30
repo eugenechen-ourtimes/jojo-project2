@@ -29,6 +29,7 @@
 #include <iostream>
 #include <tuple>
 #include <dirent.h>
+const char *del = "-";
 using namespace std;
 
 /* { OPT_STRING, "text", &textFileName, "text file to disambiguate" } */
@@ -38,6 +39,7 @@ static Option options[] = {
 };
 
 char TimeUtils::time_cstr[32] = "";
+char TimeUtils::buffer[32] = "";
 
 template<typename KeyType, typename ValueType> 
 pair<KeyType,ValueType> maxValue(const map<KeyType,ValueType> &x)
@@ -677,16 +679,13 @@ void Server::CommandHandler::handleSendFile(int connFd)
 	);
 
 	string targetUserDownloadFolder = fileUploadFolder + string(targetUserName) + "/";
-	DIR *dir = opendir(targetUserDownloadFolder.c_str());
-	if (dir == NULL) {
-		int ret = mkdir(targetUserDownloadFolder.c_str(), 0700);
-		if (ret < 0) {
-			perror(targetUserDownloadFolder.c_str());
-			exit(-1);
-		}
-	}
+	
+	mkdirIfNotExist(targetUserDownloadFolder.c_str());
 
-	string path = targetUserDownloadFolder + string(fileName);
+
+	string baseName = string(TimeUtils::encode_time_str(time_cstr)) + del + string(fileName);
+	string path = targetUserDownloadFolder + baseName;
+
 	FILE *fp = fopen(path.c_str(), "w");
 
 	if (fp == NULL) {
@@ -698,10 +697,15 @@ void Server::CommandHandler::handleSendFile(int connFd)
 	recv(connFd, &sz, sizeof(size_t), 0);
 
 	if (sz > 20 * MB) {
+		bool permit = false;
 		fprintf(stderr, "%s: file size too large!\n", fileName);
+		send(connFd, &permit, sizeof(bool), 0);
 		return;
 	}
 
+	bool permit = true;
+	send(connFd, &permit, sizeof(bool), 0);
+	
 	int32_t _sz = sz;
 	int32_t size;
 	char buf[IOBufSize];
@@ -713,6 +717,7 @@ void Server::CommandHandler::handleSendFile(int connFd)
 	}
 
 	fclose(fp);
+	fprintf(stderr, "receive file %s uploaded by %s, send it to %s\n", fileName, fromUserName, targetUserName);
 }
 
 void Server::saveHistory
@@ -856,35 +861,39 @@ void Server::sendOfflineData(string username)
 void Server::CommandHandler::handleDownloadRequest(int connFd)
 {
 
-	char username[64], filename[64] ;
-	int usernameLen, filenameLen ;
+	char username[64], filename[64];
+	char time_cstr[32];
+	int time_len;
+	int usernameLen, filenameLen;
 
 	recv(connFd, &usernameLen, sizeof(int), 0);
 	recv(connFd, username, usernameLen, 0);
 	recv(connFd, &filenameLen, sizeof(int), 0);
 	recv(connFd, filename, filenameLen, 0);
+	recv(connFd, &time_len, sizeof(int), 0);
+	recv(connFd, time_cstr, time_len, 0);
+
 	username[usernameLen] = '\0';
 	filename[filenameLen] = '\0';
+	time_cstr[time_len] = '\0';
 	
 	int permit = 0;
-	string targetUserDownloadFolder = fileUploadFolder + string(username) + "/";
-	cout << targetUserDownloadFolder << '\n' ;
-	DIR *dir = opendir(targetUserDownloadFolder.c_str());
-	if (dir == NULL) {
-		send(connFd, &permit, sizeof(int), 0);
-		return ;
-	}
+	string downloadFolder = fileUploadFolder + string(username) + "/";
+	
+	fprintf(stderr, "%s\n", downloadFolder.c_str());
 
-	string path = targetUserDownloadFolder + string(filename);
+	string baseName = string(TimeUtils::encode_time_str(time_cstr)) + del + string(filename);
+	string path = downloadFolder + baseName;
 	FILE *fp = fopen(path.c_str(), "rb");
 
 	if (fp == NULL) {
 		send(connFd, &permit, sizeof(int), 0);
 		return ;
 	}
+
 	permit = 1;
 	send(connFd, &permit, sizeof(int), 0);
-	cout << path << '\n' ;
+	fprintf(stderr, "%s\n", path.c_str());
 
 	char buf[IOBufSize];
 	int32_t size;
@@ -903,5 +912,5 @@ void Server::CommandHandler::handleDownloadRequest(int connFd)
 		sz -= size;
 	}
 	fclose(fp);
-	return ;
+	fprintf(stderr, "transfer file %s to %s\n", filename, username);
 }

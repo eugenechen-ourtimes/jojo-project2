@@ -3,7 +3,9 @@
 #define _TIME_UTILS_HPP_
 
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
+#include <ctype.h>
 
 class TimeUtils
 {
@@ -40,9 +42,20 @@ class TimeUtils
 			fprintf(stderr, "time conversion error\n");
 		}
 
+		static char *encode_time_str(const char *raw_time_str)
+		{
+			if (raw_time_str == NULL) return NULL;
+			strcpy(buffer, raw_time_str);
+			for (int i = 0; ; i++) {
+				if (buffer[i] == '\0') return buffer;
+				if (!isdigit(buffer[i])) buffer[i] = '_';
+			}
+		}
+
 	private:
 		static time_t t;
 		static char time_cstr[32];
+		static char buffer[32];
 };
 
 const char *TimeUtils::format = "%Y/%m/%d--%H:%M:%S";

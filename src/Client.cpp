@@ -185,13 +185,23 @@ class Client {
 			}
 
 			if (strCommand == CommandHelper::DOWNLOAD){
-				helper.download(ret, arg1);
+				if (helper.getState() != ::ONLINE) {
+					helper.promptStateIncorrect();
+					return;
+				}
+				
+				if (ret < 3) {
+					fprintf(stderr,"format error! \033[33m\033[1m\\download\033[0m should be followed by only one parameter [%s], or you can input \033[33m\033[1m\\help\033[0m to see advanced instruction\n", "%s");
+					return;
+				}
+
+				helper.download(ret, arg1, arg2);
 				return;
 			}
 
 			if (strCommand == CommandHelper::DOWNLOADLIST){
 				helper.showDownloadList();
-				return ;
+				return;
 			}
 		}
 
@@ -209,6 +219,8 @@ class Client {
 				fprintf(stderr, "server disconnected\n");
 				exit(0);
 			}
+
+			bool hasFile = false;
 
 			while (numOfLines--) {
 				recv(fd, &fromUserNameLen, sizeof(int), 0);
@@ -243,6 +255,10 @@ class Client {
 					content,
 					time_cstr
 				);
+
+				if (isFile) hasFile = true;
+
+				/*
 				if (isFile) {
 					fprintf(stderr, "Input \033[33m\033[1m\\download [filename]\033[0m to download the file.\n");
 					string targetDownloadPath = "../data/client/download/";
@@ -257,11 +273,21 @@ class Client {
 							exit(-1);
 						}
 					}
-					string targetDownloadList = targetDownloadFolder + "downloadList" ;
-					FILE *fp = fopen(targetDownloadList.c_str(), "a");
-					fprintf(fp,"%s\n", content);
+
+					string downloadListPath = CommandHelper::downloadListFolder + helper.getUsername();
+					FILE *fp = fopen(downloadListPath.c_str(), "a");
+					if (fp == NULL) {
+						perror(downloadListPath.c_str());
+						exit(-2);
+					}
+
+					fprintf(fp, "%s\n", content);
 					fclose(fp);
-				}
+				} */
+			}
+
+			if (hasFile) {
+				fprintf(stderr, "Input \033[33m\033[1m\\download [filename]\033[0m to download files.\n");
 			}
 		}
 

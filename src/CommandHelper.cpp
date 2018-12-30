@@ -19,6 +19,8 @@ class CommandHelper {
 		static const string strEmpty;	/* [Empty] */
 		static const string strHidden;  /* [Hidden] */
 		static const string savedPasswordFolder; /* ../data/client/pass/ */
+		static const string downloadFolder;
+		static const string downloadListFolder;
 
 		static const string HELP;		/* help */
 		static const string REFRESH;	/* refresh */
@@ -37,13 +39,12 @@ class CommandHelper {
 		static const string DOWNLOAD;
 		static const string DOWNLOADLIST;
 
-		//vector < string > downloadList ;
-		CommandHelper(int connFd, State state) {
+		CommandHelper(int connFd, State state)
+		{
 			this->connFd = connFd;
 			setState(state);
 			signUpHelper.setFd(connFd);
 			memset(storedPassword, '\0', PasswordBuffer);
-
 			showHomePage();
 		}
 
@@ -503,13 +504,21 @@ class CommandHelper {
 			int32_t size;
 
 			send(connFd, &sz, sizeof(size_t), 0);
+			bool permit = false;
+			recv(connFd, &permit, sizeof(bool), 0);
+			
+			if (permit) {
+				while (sz != 0) {
+					size = (sz < IOBufSize) ? sz: IOBufSize;
+					fread(buf, 1, size, fp);
+					send(connFd, &size, 4, 0);
+					send(connFd, buf, size, 0);
+					sz -= size;
+				}
+			}
 
-			while (sz != 0) {
-				size = (sz < IOBufSize) ? sz: IOBufSize;
-				fread(buf, 1, size, fp);
-				send(connFd, &size, 4, 0);
-				send(connFd, buf, size, 0);
-				sz -= size;
+			else {
+				fprintf(stderr, "server says file size too large!\n");
 			}
 
 			fclose(fp); free(path); free(ts1); free(ts2);
@@ -597,23 +606,49 @@ class CommandHelper {
 			this->username = username;
 		}
 		
-		void download(int ret, string arg) {
+		void download(int ret, string arg1, string arg2) {
 			//Command command = ::DOWNLOADPAGE;
 			if (state != ::ONLINE) {				
 				promptStateIncorrect();
 				return ;
 			}
-			if (ret != 2) {
-				fprintf(stderr,"format error! \033[33m\033[1m\\download\033[0m should be followed by only one parameter [%s], or you can input \033[33m\033[1m\\help\033[0m to see advanced instruction\n", "%s");
-				return ;
-			}
-			downloadRequest(arg);
+
+			downloadRequest(arg1, arg2);
 			return;
 		}
 
 
 		void showDownloadList()
 		{
+			fprintf(stderr, "show download list\n");
+			return;
+			string downloadListPath = downloadListFolder + getUsername();
+			FILE *fp = fopen(downloadListPath.c_str(), "r");
+			if (fp == NULL) {
+				fprintf(stderr,"No available file for downloading.\n");
+				return;
+			}
+
+			fprintf(stderr,"\ninput \033[33m\033[1m\\download [%s]\033[0m to require downloading a file.\n","%s");
+			
+			char line[64];
+			char name[64];
+			int index = 0;
+			while (fgets(line, sizeof(line), fp)) {
+				sscanf(line, "%s", name);
+				fprintf(stderr, "\033[33m\033[1m%s\033[0m\t\n", name);
+				/*if (index % 6 == 0) {
+					fprintf(stderr,"\n\033[33m\033[1m%s\033[0m    ",name);
+				}
+				else {
+					fprintf(stderr,"\033[33m\033[1m%s\033[0m    ",name);
+				}
+				index++;*/
+			}
+
+			fclose(fp);
+
+			/*
 			string targetDownloadPath = "../data/client/download/";
 			string targetDownloadFolder = targetDownloadPath + username + "/";
 			DIR *dir = opendir(targetDownloadFolder.c_str());
@@ -621,6 +656,7 @@ class CommandHelper {
 				fprintf(stderr,"No available file for downloading.\n");
 				return;
 			}
+			closedir(dir);
 			string targetDownloadList = targetDownloadFolder + "downloadList" ;
 			FILE *fp = fopen(targetDownloadList.c_str(), "r");
 			if (fp == NULL) {
@@ -644,44 +680,45 @@ class CommandHelper {
 			}
 			fprintf(stderr,"\n");
 			return;
+			*/
 		}
 
 
 
-		void downloadRequest(string filename) {
-			fprintf(stderr,"file requiring\n");
+		void downloadRequest(string filename, string timeStr) {
+			fprintf(stderr, "file requesting\n");
 						
 			Command command = ::download;
 			assert(send(connFd, &command, sizeof(int), 0) == sizeof(int));
 			int usernameLen = username.length(), filenameLen = filename.length();
-			
+			int timeStrLen = timeStr.length();
 			send(connFd, &usernameLen, sizeof(int), 0);
 			send(connFd, username.c_str(), usernameLen, 0);
 			send(connFd, &filenameLen, sizeof(int), 0);
 			send(connFd, filename.c_str(), filenameLen, 0);
+			send(connFd, &timeStrLen, sizeof(int), 0);
+			send(connFd, timeStr.c_str(), timeStrLen, 0);
+
+
 			int permit;
 			recv(connFd, &permit, sizeof(int), 0);
+			
 			if (!permit) {
-				fprintf(stderr,"File not exist.\n");
-				return ;
+				fprintf(stderr, "rejected.\n");
+				return;
+				/*fprintf(stderr,"File not exist.\n");*/
 			}
 			
-			string targetDownloadPath = "../data/client/download/";
-			string targetDownloadFolder = targetDownloadPath + username + "/";
-					
-			DIR *dir = opendir(targetDownloadFolder.c_str());
-			if (dir == NULL) {
-				int ret = mkdir(targetDownloadFolder.c_str(), 0700);
-				if ( ret < 0 ) {
-					perror(targetDownloadFolder.c_str());
-					exit(-1);
-				}
-			}
-			string targetFile = targetDownloadFolder + filename ;
-			FILE *fp = fopen(targetFile.c_str(), "w");
+			string selfDownloadFolder = downloadFolder + username + "/";
+			
+			mkdirIfNotExist(selfDownloadFolder.c_str());
+
+			string downloadFilePath = selfDownloadFolder + filename;
+			FILE *fp = fopen(downloadFilePath.c_str(), "w");
 
 			size_t sz = 0;
 			recv(connFd, &sz, sizeof(size_t), 0);
+			assert(sz <= 20 * MB);
 			int32_t _sz = sz;
 			int32_t size;
 			char buf[IOBufSize];
@@ -692,13 +729,16 @@ class CommandHelper {
 				_sz -= size;
 			}
 			fclose(fp);
-			return ;
-
+			fprintf(stderr, "%s downloaded\n", filename.c_str());
 		}
 
 		string getUsername()
 		{
 			return username;
+		}
+
+		void promptStateIncorrect() {
+			fprintf(stderr, "state incorrect\n");
 		}
 		
 	private:
@@ -711,9 +751,6 @@ class CommandHelper {
 
 		void promptReturningToHomePage() {
 			fprintf(stderr, "returning to home page ...\n%s\n", del);
-		}
-		void promptStateIncorrect() {
-			fprintf(stderr, "state incorrect\n");
 		}
 
 		void showHomePage()
@@ -744,6 +781,8 @@ const string CommandHelper::strEmpty = "[Empty]";
 const string CommandHelper::strHidden = "[Hidden]";
 const string CommandHelper::savedPasswordFolder = "../data/client/pass/";
 //const string CommandHelper::savedDownloadFolder = "../data/client/download";
+const string CommandHelper::downloadFolder = "../data/client/download/";
+const string CommandHelper::downloadListFolder = "../data/client/downloadList/";
 
 const string CommandHelper::HELP = "\\help";
 const string CommandHelper::REFRESH = "\\refresh";
