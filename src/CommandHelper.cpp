@@ -141,20 +141,20 @@ class CommandHelper {
 				return;
 			}
 			
-			fprintf(stderr,"Please input your ID or input \033[33m\033[1m\\return \033[0m to exit\n");
+			fprintf(stderr,"Please input your username or input \033[33m\033[1m\\return \033[0m to exit\n");
 			fprintf(stderr,"Input your username: ");
 			char line[64];
-			char ID[32];
+			char username[32];
 			fgets(line, 64, stdin);
-			sscanf(line, "%s", ID);
-			if(!strcmp(ID,"\\return")){
+			sscanf(line, "%s", username);
+			if(!strcmp(username,"\\return")){
 				refresh() ;
 				return  ;
 			}
 
 			char* password;
 
-			string savedPasswordPath = savedPasswordFolder + string(ID);
+			string savedPasswordPath = savedPasswordFolder + string(username);
 			FILE *fp = fopen(savedPasswordPath.c_str(), "r");
 			bool passwordFileAccessible = (fp != NULL);
 			if (passwordFileAccessible) {
@@ -179,10 +179,10 @@ class CommandHelper {
 			Command command = ::login;
 
 			send(connFd, &command, sizeof(int), 0);
-			int IDLen = strlen(ID);
+			int userLen = strlen(username);
 			int passwordLen = strlen(password) ;
-			send(connFd, &IDLen, sizeof(int), 0);
-			send(connFd, ID, IDLen, 0);
+			send(connFd, &userLen, sizeof(int), 0);
+			send(connFd, username, userLen, 0);
 			send(connFd, &passwordLen, sizeof(int), 0);
 			send(connFd, password, passwordLen, 0);
 			LoginResult result = Uninitialized;
@@ -190,7 +190,7 @@ class CommandHelper {
 
 			if (result == Login) {
 				fprintf(stderr, GRN "=> login successful\n" RESET);
-				setUsername(string(ID));
+				setUsername(string(username));
 				setState(::ONLINE);
 				if (!passwordFileAccessible) {
 					savePassword(savedPasswordPath.c_str(), password);
@@ -595,7 +595,7 @@ class CommandHelper {
 			}
 
 			#undef DEFAULT
-			
+
 			Command command = ::history;
 			assert(send(connFd, &command, sizeof(int), 0) == sizeof(int));
 			int usernameLen = username.length();

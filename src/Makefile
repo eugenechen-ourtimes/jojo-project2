@@ -11,6 +11,7 @@ CLIENT_OBJS=Client.o option.o SignUpHelper.o
 SERVER_OBJS=Server.o option.o
 
 %.o: %.c
+	@echo "making: " $@
 	@gcc $< -c $(CFLAG) $(INCLUDE)
 %.o: %.cpp
 	@echo "making: " $@
