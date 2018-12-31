@@ -181,7 +181,11 @@ class Client {
 			}
 
 			if (strCommand == CommandHelper::HISTORY) {
-				helper.history();
+				if (helper.getState() != :: ONLINE) {
+					helper.promptStateIncorrect();
+					return;
+				}
+				helper.history((ret == 1) ? NULL: arg1);
 				return;
 			}
 

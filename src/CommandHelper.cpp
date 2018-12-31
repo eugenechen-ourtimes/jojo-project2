@@ -582,8 +582,20 @@ class CommandHelper {
 			}
 		}
 
-		void history()
+		void history(const char *arg)
 		{
+			#define DEFAULT 20
+			int bufSize = DEFAULT;
+			if (arg != NULL) {
+				bufSize = atoi(arg);
+				if (bufSize <= 0) {
+					fprintf(stderr, "argument should be positive\n");
+					return;
+				}
+			}
+
+			#undef DEFAULT
+			
 			Command command = ::history;
 			assert(send(connFd, &command, sizeof(int), 0) == sizeof(int));
 			int usernameLen = username.length();
@@ -594,6 +606,14 @@ class CommandHelper {
 			recv(connFd, &a1, sizeof(bool), 0);
 			if (!a1) {
 				fprintf(stderr, "username incorrect\n");
+				return;
+			}
+
+			bool permit = false;
+			send(connFd, &bufSize, sizeof(int), 0);
+			recv(connFd, &permit, sizeof(bool), 0);
+			if (!permit) {
+				fprintf(stderr, "server: argument should be positive\n");
 				return;
 			}
 
@@ -687,7 +707,7 @@ class CommandHelper {
 			if (arg != NULL) {
 				bufSize = atoi(arg);
 				if (bufSize <= 0) {
-					fprintf(stderr, "argument should be non-negative\n");
+					fprintf(stderr, "argument should be positive\n");
 					return;
 				}
 			}

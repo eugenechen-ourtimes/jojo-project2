@@ -783,6 +783,13 @@ void Server::CommandHandler::handleHistoryRequest(int connFd)
 	send(connFd, &a1, sizeof(bool), 0);
 	if (!a1) return;
 
+	int bufSize = -1;
+	recv(connFd, &bufSize, sizeof(int), 0);
+	fprintf(stderr, "bufSize = %d\n", bufSize);
+	bool permit = (bufSize > 0);
+	send(connFd, &permit, sizeof(bool), 0);
+	if (!permit) return;
+
 	string userHistoryPath = historyFolder + string(user);
 	FILE *fp = fopen(userHistoryPath.c_str(), "r");
 	
@@ -802,6 +809,7 @@ void Server::CommandHandler::handleHistoryRequest(int connFd)
 	queue < string > history;
 	while (fgets(line, 1024, fp) != NULL) {
 		history.push(string(line));
+		if (history.size() > bufSize) history.pop();
 	}
 
 	fclose(fp);
@@ -980,7 +988,7 @@ void Server::CommandHandler::handleDownloadRequest(int connFd)
 		send(connFd, buf, size, 0);
 		sz -= size;
 	}
-	
+
 	fclose(fp);
 	fprintf(stderr, "transfer file %s to %s\n", filename, username);
 }
