@@ -75,12 +75,12 @@ class CommandHelper {
 
 			if (state == ::ONLINE) {
 				fprintf(stderr,"input \033[33m\033[1m \\send [-m] [ID] 'message' \033[0mto send a message to a specific ID. Message transmitting is the default action of \033[33m\033[1m\\send\033[0m, so [-m] is optional\n\n");
-	fprintf(stderr,"input \033[33m\033[1m \\send [-f] [ID] 'filename' \033[0mto send a file to a specific ID. Make sure you have -f before the filename\n\n");
-	fprintf(stderr,"input \033[33m\033[1m \\list \033[0mto ask a list of ID which has enrolled on the Chatroom.\n\n");
-	fprintf(stderr,"input \033[33m\033[1m \\history \033[0mto check previous message.\n\n");	
-	fprintf(stderr,"input \033[33m\033[1m \\download-list \033[0mto check the files available for downloading.\n\n");
-	fprintf(stderr,"input \033[33m\033[1m \\download [filename]\033[0mto download the corresponding file.\n\n");
-	fprintf(stderr,"input \033[33m\033[1m \\logout \033[0mto logout and go back to initial login menu.\n\n");				
+				fprintf(stderr,"input \033[33m\033[1m \\send [-f] [ID] 'filename' \033[0mto send a file to a specific ID. Make sure you have specify -f for file sending\n\n");
+				fprintf(stderr,"input \033[33m\033[1m \\list \033[0mto ask a list of ID which has enrolled on the Chatroom.\n\n");
+				fprintf(stderr,"input \033[33m\033[1m \\history \033[0mto check previous message.\n\n");	
+				fprintf(stderr,"input \033[33m\033[1m \\download-list \033[0mto check the files available for downloading.\n\n");
+				fprintf(stderr,"input \033[33m\033[1m \\download [filename]\033[0m to download the corresponding file.\n\n");
+				fprintf(stderr,"input \033[33m\033[1m \\logout \033[0mto logout and go back to initial login menu.\n\n");				
 
 				/*
 				fprintf(stderr, "** \\list [-a]\n"
@@ -163,6 +163,10 @@ class CommandHelper {
 				password = storedPassword;
 				fclose(fp);
 			} else {
+				if (errno != ENOENT) {
+					perror(savedPasswordPath.c_str());
+					exit(-1);
+				}
 				/*perror(savedPasswordPath.c_str());*/
 				fprintf(stderr,"Please key in your password or input \033[33m\033[1m\\return \033[0m to exit\n");
 				password = getpass("Input your password: ");
@@ -234,8 +238,8 @@ class CommandHelper {
 		{
 			FILE *fp = fopen(path.c_str(), "w");
 			if (fp == NULL) {
-				/* perror(path.c_str()); */
-				return;
+				perror(path.c_str());
+				exit(-1);
 			}
 
 			fprintf(stderr, "\033[31m\033[1mDo you want to save your password? (Y/N) : \033[0m");
@@ -387,7 +391,7 @@ class CommandHelper {
 
 		void list()
 		{
-			Command command = ::listUsers ;
+			Command command = ::listUsers;
 			send(connFd, &command, sizeof(int), 0);
 			int size;
 			bool permit = false;
@@ -400,12 +404,12 @@ class CommandHelper {
 			recv(connFd, &size, sizeof(int), 0);
 			fprintf(stderr, "\033[32m\033[1m\033[45menrolled users:\033[0m\n\n");
 			while (size--) {
-				int usernameLen ;
-				char username[32] ;
+				int usernameLen;
+				char username[32];
 				recv(connFd, &usernameLen, sizeof(int), 0);
 				recv(connFd, username, usernameLen, 0);
-				username[usernameLen] = '\0' ;
-				fprintf(stderr,"* %s\n",username);
+				username[usernameLen] = '\0';
+				fprintf(stderr,"* %s\n", username);
 			}
 		}
 
@@ -440,8 +444,9 @@ class CommandHelper {
 
 			bool a1 = false;
 			recv(connFd, &a1, sizeof(bool), 0);
+
 			if (!a1) {
-				fprintf(stderr, "server says src username incorrect\n");
+				fprintf(stderr, "src username incorrect\n");
 				return;
 			}
 
@@ -450,6 +455,7 @@ class CommandHelper {
 
 			bool a2 = false;
 			recv(connFd, &a2, sizeof(bool), 0);
+
 			if (!a2) {
 				fprintf(stderr, "dst username does not exist\n");
 				return;
@@ -462,8 +468,10 @@ class CommandHelper {
 		void sendFile(string target, string arg)
 		{
 			int pathLen = arg.length();
-			char *path = (char *)malloc(pathLen);
+			char *path = (char *)malloc(pathLen + 1);
 			strcpy(path, arg.c_str());
+
+			/* check regular file */
 
 			FILE *fp = fopen(path, "rb");
 			if (fp == NULL) {
@@ -473,10 +481,10 @@ class CommandHelper {
 			}
 
 			fseek(fp, 0L, SEEK_END);
-			size_t sz = ftell(fp);
+			int64_t sz = ftell(fp);
 
-			if (sz > 20 * MB) {
-				fprintf(stderr, "%s: file size too large ... no more than 20 MB.\n", path);
+			if (sz > MaxFile) {
+				fprintf(stderr, "%s: file size too large ... no more than %d MB.\n", path, Limit);
 				fclose(fp);
 				free(path);
 				return;
@@ -511,8 +519,8 @@ class CommandHelper {
 			bool a1 = false;
 			recv(connFd, &a1, sizeof(bool), 0);
 			if (!a1) {
+				fprintf(stderr, "username incorrect\n");
 				fclose(fp); free(path); free(ts1); free(ts2);
-				fprintf(stderr, "server says src username incorrect\n");
 				return;
 			}
 			
@@ -522,8 +530,8 @@ class CommandHelper {
 			bool a2 = false;
 			recv(connFd, &a2, sizeof(bool), 0);
 			if (!a2) {
-				fclose(fp); free(path); free(ts1); free(ts2);
 				fprintf(stderr, "dst username does not exist\n");
+				fclose(fp); free(path); free(ts1); free(ts2);
 				return;
 			}
 
@@ -533,15 +541,14 @@ class CommandHelper {
 			char buf[IOBufSize];
 			int32_t size;
 
-			send(connFd, &sz, sizeof(size_t), 0);
+			send(connFd, &sz, 8, 0);
 			bool permit = false;
 			recv(connFd, &permit, sizeof(bool), 0);
 			
 			if (permit) {
-				while (sz != 0) {
+				while (sz > 0) {
 					size = (sz < IOBufSize) ? sz: IOBufSize;
 					fread(buf, 1, size, fp);
-					send(connFd, &size, 4, 0);
 					send(connFd, buf, size, 0);
 					sz -= size;
 				}
@@ -550,6 +557,8 @@ class CommandHelper {
 			else {
 				fprintf(stderr, "server says file size too large!\n");
 			}
+
+			fprintf(stderr, "file uploaded\n");
 
 			fclose(fp); free(path); free(ts1); free(ts2);
 		}
@@ -584,29 +593,31 @@ class CommandHelper {
 			bool a1 = false;
 			recv(connFd, &a1, sizeof(bool), 0);
 			if (!a1) {
-				fprintf(stderr, "server says username incorrect\n");
+				fprintf(stderr, "username incorrect\n");
 				return;
 			}
 
 			int lineCount = -1;
 			char line[1000];
-			char fromUserName[64];
-			char targetUserName[64];
+			char srcUser[64];
+			char dstUser[64];
 			char content[256];
 			char time_cstr[32];
 			int type;
 
 			recv(connFd, &lineCount, sizeof(int), 0);
-			const char *color = "\033[36m\033[1m";
+			#define COLOR "\033[36m\033[1m"
+
 			while (lineCount--) {
 				int L = -1;
 				recv(connFd, &L, sizeof(int), 0);
 				recv(connFd, line, L, 0);
+
 				line[L] = '\0';
 				
 				type = Zero;
 				
-				sscanf(line, "%s%s%s%d%s", fromUserName, targetUserName, content, &type, time_cstr);
+				sscanf(line, "%s%s%s%d%s", srcUser, dstUser, content, &type, time_cstr);
 				if (type != Message && type != File) {
 					fprintf(stderr, "Unknown type %d\n", type);
 					continue;
@@ -614,18 +625,16 @@ class CommandHelper {
 				
 				int isFile = (type == File) ? 1: 0;
 
-				fprintf(stderr, "%s%s%s %s %s%s%s %s\t%s\n",
-					color,
-					fromUserName,
-					reset,
+				fprintf(stderr, COLOR "%s" RESET " %s " COLOR "%s" RESET " %s\t%s\n", 
+					srcUser,
 					arrow[isFile],
-					color,
-					targetUserName,
-					reset,
+					dstUser,
 					content,
 					time_cstr
-				);
+					);
 			}
+
+			#undef COLOR
 		}
 
 		void setState(State state)
@@ -644,7 +653,6 @@ class CommandHelper {
 		}
 		
 		void download(string arg1, string arg2) {
-			//Command command = ::DOWNLOADPAGE;
 			if (state != ::ONLINE) {				
 				promptStateIncorrect();
 				return ;
@@ -660,6 +668,10 @@ class CommandHelper {
 			string downloadListPath = downloadListFolder + getUsername();
 			FILE *fp = fopen(downloadListPath.c_str(), "r");
 			if (fp == NULL) {
+				if (errno != ENOENT) {
+					perror(downloadListPath.c_str());
+					exit(-1);
+				}
 				fprintf(stderr,"No available file for downloading.\n");
 				return;
 			}
@@ -681,7 +693,7 @@ class CommandHelper {
 		void downloadRequest(string filename, string timeStr)
 		{
 			fprintf(stderr, "file requesting\n");
-						
+					
 			Command command = ::download;
 			assert(send(connFd, &command, sizeof(int), 0) == sizeof(int));
 			int usernameLen = username.length(), filenameLen = filename.length();
@@ -708,9 +720,8 @@ class CommandHelper {
 			recv(connFd, &permit, sizeof(int), 0);
 			
 			if (!permit) {
-				fprintf(stderr, "rejected.\n");
+				fprintf(stderr, "File not exist.\n");
 				return;
-				/*fprintf(stderr,"File not exist.\n");*/
 			}
 			
 			string selfDownloadFolder = downloadFolder + username + "/";
@@ -718,19 +729,27 @@ class CommandHelper {
 			mkdirIfNotExist(selfDownloadFolder.c_str());
 
 			string downloadFilePath = selfDownloadFolder + filename;
-			FILE *fp = fopen(downloadFilePath.c_str(), "w");
+			FILE *fp = fopen(downloadFilePath.c_str(), "wb");
+			if (fp == NULL) {
+				perror(downloadFilePath.c_str());
+				exit(-1);
+			}
 
-			size_t sz = 0;
-			recv(connFd, &sz, sizeof(size_t), 0);
-			assert(sz <= 20 * MB);
-			int32_t _sz = sz;
-			int32_t size;
+			int64_t sz = 0;
+			recv(connFd, &sz, 8, 0);
+			assert(sz <= MaxFile);
+
 			char buf[IOBufSize];
-			while (_sz > 0) {
-				recv(connFd, &size, 4, 0);
-				recv(connFd, buf, size, 0);
-				fwrite(buf, 1, size, fp);
-				_sz -= size;
+			int ret;
+			while (sz > 0) {
+				int32_t size = (sz < IOBufSize) ? sz: IOBufSize;
+				int ret = recv(connFd, buf, size, 0);
+				if (ret == 0) {
+					fprintf(stderr, "error\n");
+					exit(-1);
+				}
+				fwrite(buf, 1, ret, fp);
+				sz -= ret;
 			}
 			fclose(fp);
 			fprintf(stderr, "%s downloaded\n", filename.c_str());

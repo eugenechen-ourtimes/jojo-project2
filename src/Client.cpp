@@ -4,6 +4,7 @@ const char *arrow[2] = {"=>", "->"};
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
+#include <errno.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -56,7 +57,7 @@ class Client {
 
 			while (1) {
 
-				memcpy(&working_set, &read_set, sizeof(fd_set) );
+				memcpy(&working_set, &read_set, sizeof(fd_set));
 				select(connFd + 1 , &working_set, NULL, NULL, NULL);
 				
 				if (FD_ISSET(STDIN_FILENO, &working_set)) {
@@ -184,7 +185,7 @@ class Client {
 				return;
 			}
 
-			if (strCommand == CommandHelper::DOWNLOAD){
+			if (strCommand == CommandHelper::DOWNLOAD) {
 				if (helper.getState() != ::ONLINE) {
 					helper.promptStateIncorrect();
 					return;
@@ -195,7 +196,7 @@ class Client {
 					return;
 				}
 
-				helper.download(arg1, (ret == 2) ? "": arg2);
+				helper.download(string(arg1), (ret == 2) ? "": string(arg2));
 				return;
 			}
 
@@ -243,18 +244,21 @@ class Client {
 				content[contentLen] = '\0';
 				time_cstr[time_len] = '\0';
 
+				bool received = true;
+				send(fd, &received, sizeof(bool), 0);
+
 				int isFile = (type == File) ? 1: 0;
 
-				const char *color = "\033[31m\033[1m";
+				#define COLOR "\033[31m\033[1m"
 				
-				fprintf(stderr, "%s%s%s %s %s\t%s\n",
-					color,
+				fprintf(stderr, COLOR "%s" RESET " %s %s\t%s\n",
 					fromUserName,
-					reset,
 					arrow[isFile],
 					content,
 					time_cstr
 				);
+
+				#undef COLOR
 
 				if (isFile) {
 					hasFile = true;

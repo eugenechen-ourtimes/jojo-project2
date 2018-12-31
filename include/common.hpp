@@ -1,8 +1,10 @@
 #ifndef _COMMON_HPP_
 #define _COMMON_HPP_
 
-#define IOBufSize 4096
+#define IOBufSize 1024
 #define MB 1048576
+#define Limit 20
+#define MaxFile Limit * MB
 
 #include <stdio.h>
 #include <dirent.h>
