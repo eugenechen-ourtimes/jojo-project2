@@ -962,8 +962,6 @@ void Server::CommandHandler::handleDownloadRequest(int connFd)
 	permit = 1;
 	send(connFd, &permit, sizeof(int), 0);
 
-	char buf[IOBufSize];
-	int32_t size;
 	fseek(fp, 0L, SEEK_END);
 	int64_t sz = ftell(fp);
 	fprintf(stderr, "file size: %" PRId64 "\n", sz);
@@ -975,11 +973,14 @@ void Server::CommandHandler::handleDownloadRequest(int connFd)
 
 	send(connFd, &sz, 8, 0);
 
+	char buf[IOBufSize];
 	while (sz > 0) {
-		size = (sz < IOBufSize) ? sz: IOBufSize;
+		int32_t size = (sz < IOBufSize) ? sz: IOBufSize;
+		fread(buf, 1, size, fp);
 		send(connFd, buf, size, 0);
 		sz -= size;
 	}
+	
 	fclose(fp);
 	fprintf(stderr, "transfer file %s to %s\n", filename, username);
 }

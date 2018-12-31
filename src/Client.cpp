@@ -161,7 +161,6 @@ class Client {
 					sendData(option, targetUserName, content) */
 
 				if (ret < 3) {
-					/* TODO: modify this sentence */
 					fprintf(stderr, "format error! Please input \033[33m\033[1m\\help\033[0m to make sure the format.\n");
 					return;
 				}
