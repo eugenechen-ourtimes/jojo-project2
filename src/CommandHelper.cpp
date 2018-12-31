@@ -663,7 +663,7 @@ class CommandHelper {
 		}
 
 
-		void showDownloadList()
+		void showDownloadList(const char *arg)
 		{
 			string downloadListPath = downloadListFolder + getUsername();
 			FILE *fp = fopen(downloadListPath.c_str(), "r");
@@ -680,9 +680,30 @@ class CommandHelper {
 			
 			char name[64];
 			char time_cstr[32];
-			int index = 0;
+			queue < pair < string, string > > q;
+			#define DEFAULT 10
+			int bufSize = DEFAULT;
+			#undef DEFAULT
+			if (arg != NULL) {
+				bufSize = atoi(arg);
+				if (bufSize <= 0) {
+					fprintf(stderr, "argument should be non-negative\n");
+					return;
+				}
+			}
 			while (fscanf(fp, "%s%s", name, time_cstr) != EOF) {
-				fprintf(stderr, "\033[33m\033[1m%s\033[0m\t%s\n", name, time_cstr);
+				q.push( pair < string, string > (string(name), string(time_cstr)) );
+				if (q.size() > bufSize) q.pop();
+				/*fprintf(stderr, "\033[33m\033[1m%s\033[0m\t%s\n", name, time_cstr);*/
+			}
+
+			while (!q.empty()) {
+				pair < string, string > p = q.front();
+				q.pop();
+				fprintf(stderr, "\033[33m\033[1m%s\033[0m\t%s\n",
+					p.first.c_str(),
+					p.second.c_str()
+					);
 			}
 
 			fclose(fp);

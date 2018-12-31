@@ -11,6 +11,7 @@ const char *arrow[2] = {"=>", "->"};
 #include <netdb.h>
 #include <unistd.h>
 #include <string>
+#include <queue>
 #include "option.h"
 using namespace std;
 #include "SocketAddr.cpp"
@@ -200,7 +201,7 @@ class Client {
 			}
 
 			if (strCommand == CommandHelper::DOWNLOADLIST) {
-				helper.showDownloadList();
+				helper.showDownloadList((ret == 1) ? NULL: arg1);
 				return;
 			}
 		}
