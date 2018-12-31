@@ -43,6 +43,7 @@ void SignUpHelper::reset()
 void SignUpHelper::handleInputUsername(string username)
 {
 	setUsername(username);
+	usernameTaken = false;
 	if (SignUpUtils::usernameValid()) {
 		/* check if this username is taken */
 		Command command = ::checkUsernameTaken;
@@ -127,8 +128,18 @@ void SignUpHelper::refresh()
 		return;
 	}
 
+	if (!usernameAlphaNumeric()) {
+		fprintf(stderr, YEL "=> Username May Only Contain Letters(a-z) and Numbers(0-9)\n" RESET);
+		return;
+	}
+
 	if (!password.empty() && passwordTooShort()) {
 		fprintf(stderr, YEL "=> Password Too Short\n" RESET);
+		return;
+	}
+
+	if (!password.empty() && !passwordAlphaNumeric()) {
+		fprintf(stderr, YEL "=> Password May Only Contain Letters(a-z) and Numbers(0-9)\n" RESET);
 		return;
 	}
 
