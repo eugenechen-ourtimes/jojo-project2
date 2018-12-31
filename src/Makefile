@@ -6,6 +6,7 @@ CFLAG=
 CPPFLAG=-std=c++11#-g -pthread -Wall #-D PRINT_DEBUG
 GCC=g++
 BIN=../bin
+LIB=-lbsd
 
 CLIENT_OBJS=Client.o option.o SignUpHelper.o
 SERVER_OBJS=Server.o option.o
@@ -19,11 +20,11 @@ SERVER_OBJS=Server.o option.o
 
 server: $(SERVER_OBJS)
 	@echo "making: " $@
-	@g++ -o $(BIN)/$@ $(CPPFLAG) $(INCLUDE) $(SERVER_OBJS)
+	@g++ -o $(BIN)/$@ $(CPPFLAG) $(INCLUDE) $(SERVER_OBJS) $(LIB)
 
 client: $(CLIENT_OBJS)
 	@echo "making: " $@
-	@g++ -o $(BIN)/$@ $(CPPFLAG) $(INCLUDE) $(CLIENT_OBJS)
+	@g++ -o $(BIN)/$@ $(CPPFLAG) $(INCLUDE) $(CLIENT_OBJS) $(LIB)
 clean:
 	rm -f *.o
 	@for bin in $(TARGET); do \

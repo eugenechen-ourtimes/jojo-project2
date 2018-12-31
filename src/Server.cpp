@@ -99,7 +99,7 @@ class Server {
 
 		void init() {
 			char username[64];
-			char password[1024];
+			char password[33];
 			FILE *fp = fopen(usersFileName.c_str(), "r");
 			if (fp != NULL) {
 				while (fscanf(fp, "%s%s", username, password) != EOF) {
@@ -414,9 +414,15 @@ void Server::CommandHandler::createAccount(int connFd)
 
 	if (result == OK) {
 		states[connFd] = ::HOME;
-		credentials[utils.getUsername()] = utils.getPassword();
-		fprintf(stderr, "create account <%s, %s>\n", username, password);
-		fprintf(server.usersFile, "%s %s\n", username, password);
+		string hashedPassword = md5Hash(utils.getPassword());
+		credentials[utils.getUsername()] = hashedPassword;
+		fprintf(stderr, "create account <%s, %s>\n",
+			username,
+			hashedPassword.c_str()
+			);
+		fprintf(server.usersFile, "%s %s\n",
+			username,
+			hashedPassword.c_str());
 		fflush(server.usersFile);
 	}
 
@@ -477,7 +483,7 @@ void Server::CommandHandler::handleLogin(int connFd)
 	if (it == credentials.end()) {
 		result = UsernameDoesNotExist;
 	} else {
-		if (string(password) != it->second) 
+		if (string(md5Hash(string(password))) != it->second) 
 			result = PasswordIncorrect;
 		else {
 			if (states[connFd] == ::ONLINE)
