@@ -1,3 +1,8 @@
+#ifndef _SOCKETADDR_HPP
+#define _SOCKETADDR_HPP
+
+#include <string>
+using namespace std;
 static char *host = (char *)"localhost";
 static unsigned port = 3000; 
 class SocketAddr: pair < string, unsigned > {
@@ -36,3 +41,5 @@ class SocketAddr: pair < string, unsigned > {
         	return (pair<string, unsigned>) *this < (pair<string, unsigned>) right;
         }
 };
+
+#endif

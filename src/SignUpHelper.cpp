@@ -1,6 +1,7 @@
 #include "SignUpHelper.hpp"
 #include "Command.hpp"
 #include "color.hpp"
+#include "CommandHelper.hpp"
 #include <sys/socket.h>
 static const string strEmpty = "[Empty]";
 static const string strHidden = "[Hidden]";
@@ -183,5 +184,12 @@ void SignUpHelper::refresh()
 	}
 
 	fprintf(stderr,"\n" "    " BOLD "One account. Meet all your friends at Chatroom\n" RESET);
-	fprintf(stderr,     "    " "\033[33m\033[1m\\username [%s]   \\password   \\confirm-password   \\cancel   \\create-account   \\help\033[0m\n","%s");
+	fprintf(stderr,     "    " BYEL "\\username [%s]   %s   %s   %s   %s   %s\n" RESET,
+		"%s",
+		CommandHelper::PASSWORD.c_str(),
+		CommandHelper::CONFIRM_PASSWORD.c_str(),
+		CommandHelper::CANCEL.c_str(),
+		CommandHelper::CREATE_ACCOUNT.c_str(),
+		CommandHelper::HELP.c_str()
+		);
 }

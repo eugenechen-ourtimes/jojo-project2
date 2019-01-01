@@ -11,6 +11,8 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <bsd/md5.h>
+#include <string>
+using namespace std;
 
 int mkdirIfNotExist(const char *dirname)
 {

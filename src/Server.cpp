@@ -24,17 +24,14 @@
 #include <string>
 #include <algorithm>
 #include <queue>
-#include <assert.h>
 #include "SignUpUtils.hpp"
 #include "common.hpp"
-#include <iostream>
 #include <tuple>
 #include <dirent.h>
 const char *del = "-";
 using namespace std;
 
-/* { OPT_STRING, "text", &textFileName, "text file to disambiguate" } */
-#include "SocketAddr.cpp"
+#include "SocketAddr.hpp"
 static Option options[] = {
 	{ OPT_UINT, "port", &port, "port number"}
 };
@@ -355,8 +352,8 @@ unsigned Server::getMaxFd()
 void Server::CommandHandler::handleSignUpRequest(int connFd)
 {
 	map < string, string > &credentials = server.credentials;
-	bool permit = (credentials.size() < maxAccount);
-	send(connFd, &permit, sizeof(bool), 0);
+	char permit = (credentials.size() < maxAccount) ? 1: 0;
+	send(connFd, &permit, 1, 0);
 	if (permit) server.states[connFd] = ::REGISTER;
 }
 
@@ -368,8 +365,8 @@ void Server::CommandHandler::checkUsernameTaken(int connFd)
 	recv(connFd, username, usernameLen, 0);
 	username[usernameLen] = '\0';
 	map < string, string > &credentials = server.credentials;
-	bool usernameTaken = credentials.find(string(username)) != credentials.end();
-	send (connFd, &usernameTaken, sizeof(bool), 0);
+	char usernameTaken = credentials.find(string(username)) != credentials.end() ? 1: 0;
+	send (connFd, &usernameTaken, 1, 0);
 }
 
 void Server::CommandHandler::createAccount(int connFd)
@@ -431,15 +428,15 @@ void Server::CommandHandler::createAccount(int connFd)
 
 void Server::CommandHandler::acceptCancelSignUp(int connFd)
 {
-	bool ack = true;
-	send(connFd, &ack, sizeof(bool), 0);
+	char ack = true;
+	send(connFd, &ack, 1, 0);
 	server.states[connFd] = ::HOME;
 }
 
 void Server::CommandHandler::acceptQuit(const SocketAddr &socketAddr, int connFd)
 {
-	bool ack = true;
-	send(connFd, &ack, sizeof(bool), 0);
+	char ack = true;
+	send(connFd, &ack, 1, 0);
 	fprintf(stderr, "accept quit from %s:%u\n",
 		socketAddr.host().c_str(),
 		socketAddr.port()
@@ -524,14 +521,14 @@ void Server::CommandHandler::handleLogout(int connFd)
 	map < string, int > &onlineUsers = server.onlineUsers;
 	map < int, State >  &states = server.states;
 	map < string, int >::iterator it = onlineUsers.find(string(username));
-	bool ack = true;
+	char ack = true;
 
 	if (states[connFd] == ::ONLINE) {
 		if (it == onlineUsers.end() || it->second != connFd)
 			ack = false;
 	}
 
-	send(connFd, &ack, sizeof(bool), 0);
+	send(connFd, &ack, 1, 0);
 	if (ack) {
 		fprintf(stderr, "%s logout\n", username);
 		server.removeUserFromOnlineList(connFd);
@@ -543,8 +540,8 @@ void Server::CommandHandler::handleListUsers(int connFd)
 {
 	/* only allow when state is ::ONLINE */
 	map < int, State >  &states = server.states;
-	bool permit = states[connFd] == ::ONLINE;
-	send(connFd, &permit, sizeof(bool), 0);
+	char permit = states[connFd] == ::ONLINE ? 1: 0;
+	send(connFd, &permit, 1, 0);
 	if (!permit) return;
 	
 	map < string, string > &credentials = server.credentials;
@@ -571,8 +568,8 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 	recv(connFd, srcUser, srcLen, 0);
 	srcUser[srcLen] = '\0';
 	
-	bool a1 = (connFd == onlineUsers[string(srcUser)]);
-	send(connFd, &a1, sizeof(bool), 0);
+	char a1 = (connFd == onlineUsers[string(srcUser)]) ? 1: 0;
+	send(connFd, &a1, 1, 0);
 
 	if (!a1) return;
 
@@ -580,8 +577,8 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 	recv(connFd, dstUser, dstLen, 0);
 	dstUser[dstLen] = '\0';
 
-	bool a2 = (credentials.find(string(dstUser)) != credentials.end());
-	send(connFd, &a2, sizeof(bool), 0);
+	char a2 = (credentials.find(string(dstUser)) != credentials.end()) ? 1:-0;
+	send(connFd, &a2, 1, 0);
 	
 	if (!a2) return;
 
@@ -635,16 +632,16 @@ void Server::CommandHandler::handleSendFile(int connFd)
 	recv(connFd, srcUser, srcLen, 0);
 	srcUser[srcLen] = '\0';
 
-	bool a1 = (connFd == onlineUsers[string(srcUser)]);
-	send(connFd, &a1, sizeof(bool), 0);
+	char a1 = (connFd == onlineUsers[string(srcUser)]) ? 1: 0;
+	send(connFd, &a1, 1, 0);
 	if (!a1) return;
 
 	recv(connFd, &dstLen, sizeof(int), 0);
 	recv(connFd, dstUser, dstLen, 0);
 	dstUser[dstLen] = '\0';
 
-	bool a2 = (credentials.find(string(dstUser)) != credentials.end());
-	send(connFd, &a2, sizeof(bool), 0);
+	char a2 = (credentials.find(string(dstUser)) != credentials.end()) ? 1: 0;
+	send(connFd, &a2, 1, 0);
 	if (!a2) return;
 
 	recv(connFd, &fileNameLen, sizeof(int), 0);
@@ -700,14 +697,14 @@ void Server::CommandHandler::handleSendFile(int connFd)
 	recv(connFd, &sz, 8, 0);
 
 	if (sz > MaxFile) {
-		bool permit = false;
+		char permit = false;
 		fprintf(stderr, "%s: file size too large!\n", fileName);
-		send(connFd, &permit, sizeof(bool), 0);
+		send(connFd, &permit, 1, 0);
 		return;
 	}
 
-	bool permit = true;
-	send(connFd, &permit, sizeof(bool), 0);
+	char permit = true;
+	send(connFd, &permit, 1, 0);
 	
 	char buf[IOBufSize];
 	while (sz > 0) {
@@ -785,15 +782,15 @@ void Server::CommandHandler::handleHistoryRequest(int connFd)
 	recv(connFd, user, userLen, 0);
 	user[userLen] = '\0';
 
-	bool a1 = (connFd == onlineUsers[string(user)]);
-	send(connFd, &a1, sizeof(bool), 0);
+	char a1 = (connFd == onlineUsers[string(user)]) ? 1: 0;
+	send(connFd, &a1, 1, 0);
 	if (!a1) return;
 
 	int bufSize = -1;
 	recv(connFd, &bufSize, sizeof(int), 0);
 	fprintf(stderr, "bufSize = %d\n", bufSize);
-	bool permit = (bufSize > 0);
-	send(connFd, &permit, sizeof(bool), 0);
+	char permit = (bufSize > 0) ? 1: 0;
+	send(connFd, &permit, 1, 0);
 	if (!permit) return;
 
 	string userHistoryPath = historyFolder + string(user);
@@ -891,8 +888,8 @@ void Server::sendOfflineData(string username)
 		send(connFd, &f4Len, sizeof(int), 0);
 		send(connFd, f4.c_str(), f4Len, 0);
 
-		bool received = false;
-		recv(connFd, &received, sizeof(bool), 0);
+		char received = false;
+		recv(connFd, &received, 1, 0);
 		if (!received) allReceived = false;
 	}
 
@@ -911,8 +908,8 @@ void Server::CommandHandler::handleDownloadRequest(int connFd)
 	recv(connFd, username, usernameLen, 0);
 	username[usernameLen] = '\0';
 
-	bool a1 = (connFd == onlineUsers[string(username)]);
-	send(connFd, &a1, sizeof(bool), 0);
+	char a1 = (connFd == onlineUsers[string(username)]) ? 1: 0;
+	send(connFd, &a1, 1, 0);
 	if (!a1) return;
 
 	recv(connFd, &filenameLen, sizeof(int), 0);

@@ -8,7 +8,7 @@ GCC=g++
 BIN=../bin
 LIB=-lbsd
 
-CLIENT_OBJS=Client.o option.o SignUpHelper.o
+CLIENT_OBJS=Client.o option.o SignUpHelper.o CommandHelper.o
 SERVER_OBJS=Server.o option.o
 
 %.o: %.c

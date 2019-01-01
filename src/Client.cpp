@@ -1,5 +1,3 @@
-const char *del = "-----------------------------------------------";
-const char *arrow[2] = {"=>", "->"};
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory.h>
@@ -12,15 +10,16 @@ const char *arrow[2] = {"=>", "->"};
 #include <string>
 #include <queue>
 #include "option.h"
-using namespace std;
-#include "SocketAddr.cpp"
+#include "SocketAddr.hpp"
 #include "State.hpp"
 #include "Command.hpp"
 #include "DataType.hpp"
-#include "CommandHelper.cpp"
+#include "CommandHelper.hpp"
 #include <sys/select.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include "color.hpp"
+using namespace std;
 
 static Option options[] = {
 	{ OPT_STRING, "host", &host, "remote host"},
@@ -89,6 +88,8 @@ class Client {
 			if (ret <= 0) return;
 			string strCommand(arg0);
 
+			if (strCommand.empty()) return;
+
 			if (strCommand == CommandHelper::HELP) {
 				helper.help();
 				return;
@@ -101,22 +102,39 @@ class Client {
 
 			/* home page */
 			if (strCommand == CommandHelper::SIGN_UP) {
+				if (helper.getState() != ::HOME) {
+					helper.promptStateIncorrect();
+					return;
+				}
 				helper.signUp();
 				return;
 			}
 
 			if (strCommand == CommandHelper::LOGIN) {
+				if (helper.getState() != ::HOME) {
+					helper.promptStateIncorrect();
+					return;
+				}
 				helper.login();
 				return;
 			}
 
 			if (strCommand == CommandHelper::QUIT) {
+				if (helper.getState() != ::HOME) {
+					helper.promptStateIncorrect();
+					return;
+				}
 				helper.quit();
 				return;
 			}
 
 			/* sign-up page */
 			if (strCommand == CommandHelper::USERNAME) {
+				if (helper.getState() != ::REGISTER) {
+					helper.promptStateIncorrect();
+					return;
+				}
+
 				if (ret == 1) {
 					fprintf(stderr, "missing input string\n");
 					return;
@@ -127,28 +145,51 @@ class Client {
 			}
 
 			if (strCommand == CommandHelper::PASSWORD) {
+				if (helper.getState() != ::REGISTER) {
+					helper.promptStateIncorrect();
+					return;
+				}
+
 				helper.inputPassword();
 				return;
 			}
 
 			if (strCommand == CommandHelper::CONFIRM_PASSWORD) {
+				if (helper.getState() != ::REGISTER) {
+					helper.promptStateIncorrect();
+					return;
+				}
 				helper.confirmPassword();
 				return;
 			}
 
 			if (strCommand == CommandHelper::CANCEL) {
+				if (helper.getState() != ::REGISTER) {
+					helper.promptStateIncorrect();
+					return;
+				}
 				helper.cancelSignUp();
 				return;
 			}
 
 			if (strCommand == CommandHelper::CREATE_ACCOUNT) {
+				if (helper.getState() != ::REGISTER) {
+					helper.promptStateIncorrect();
+					return;
+				}
 				helper.createAccount();
 				return;
 			}
 			
 			if (strCommand == CommandHelper::SEND) {
+				if (helper.getState() != ::ONLINE) {
+					helper.promptStateIncorrect();
+					return;
+				}
 				if (ret < 3) {
-					fprintf(stderr, "format error! Please input \033[33m\033[1m\\help\033[0m to make sure the format.\n");
+					fprintf(stderr, "format error! input " BYEL "%s" RESET " to make sure the format\n", 
+						CommandHelper::HELP.c_str()
+						);
 					return;
 				}
 
@@ -162,6 +203,10 @@ class Client {
 			}
 
 			if (strCommand == CommandHelper::LIST) {
+				if (helper.getState() != ::ONLINE) {
+					helper.promptStateIncorrect();
+					return;
+				}
 				helper.list();
 				return;
 			}
@@ -176,6 +221,10 @@ class Client {
 			}
 
 			if (strCommand == CommandHelper::DOWNLOADLIST) {
+				if (helper.getState() != :: ONLINE) {
+					helper.promptStateIncorrect();
+					return;
+				}
 				helper.showDownloadList((ret == 1) ? NULL: arg1);
 				return;
 			}
@@ -187,18 +236,32 @@ class Client {
 				}
 
 				if (ret < 2) {
-					fprintf(stderr, "format error! \033[33m\033[1m\\download\033[0m should be followed by one parameter [%s], or you can input \033[33m\033[1m\\help\033[0m to see advanced instruction\n", "%s");
+					fprintf(stderr, "format error! " BYEL "%s" RESET " should be followed by at least one parameter [%s],"
+						" or you can input " BYEL "%s" RESET " to see advanced instruction\n",
+						CommandHelper::DOWNLOAD.c_str(),
+						"%s",
+						CommandHelper::HELP.c_str()
+						);
 					return;
 				}
 
-				helper.download(string(arg1), (ret == 2) ? "": string(arg2));
+				helper.downloadRequest(string(arg1), (ret == 2) ? "": string(arg2));
 				return;
 			}
-			
+
 			if (strCommand == CommandHelper::LOGOUT) {
 				helper.logout();
 				return;
 			}
+
+			#define COLOR "\033[36m\033[1m"
+			if (strCommand[0] != '\\') {
+				fprintf(stderr, COLOR "note: each command should have a prefix \'\\\'\n" RESET);
+				return;
+			}
+			#undef COLOR
+
+			fprintf(stderr, "no such command %s\n", strCommand.c_str());
 		}
 
 		void handleDataFromServer(int fd, CommandHelper &helper)
@@ -239,8 +302,8 @@ class Client {
 				content[contentLen] = '\0';
 				time_cstr[time_len] = '\0';
 
-				bool received = true;
-				send(fd, &received, sizeof(bool), 0);
+				char received = true;
+				send(fd, &received, 1, 0);
 
 				int isFile = (type == File) ? 1: 0;
 
@@ -248,7 +311,7 @@ class Client {
 				
 				fprintf(stderr, COLOR "%s" RESET " %s %s\t%s\n",
 					fromUserName,
-					arrow[isFile],
+					CommandHelper::arrow[isFile],
 					content,
 					time_cstr
 				);
@@ -269,7 +332,9 @@ class Client {
 			}
 
 			if (hasFile) {
-				fprintf(stderr, "Input \033[33m\033[1m\\download [filename]\033[0m to download files.\n");
+				fprintf(stderr, "input " BYEL "%s" " [filename]" RESET " to download files\n",
+					CommandHelper::DOWNLOAD.c_str()
+					);
 			}
 		}
 
