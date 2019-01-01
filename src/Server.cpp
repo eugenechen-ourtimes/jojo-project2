@@ -51,12 +51,11 @@ pair<KeyType,ValueType> maxValue(const map<KeyType,ValueType> &x)
 
 void safe_exit(int signo)
 {
-	if (signo != SIGINT && signo != SIGTERM && signo != SIGTSTP)
-		fprintf(stderr, "unexpected signal %d\n", signo);
 	fprintf(stderr,
 		(signo == SIGTERM) ?	"SIGTERM\n":
 		(signo == SIGINT) ?		"SIGINT\n":
-								"SIGTSTP\n"
+		(signo == SIGTSTP) ?		"SIGTSTP\n":
+		"unexpected signal %d\n", signo
 					);
 	exit(0);
 	/* by calling exit(0), buffer would be flushed out, all files would be closed */

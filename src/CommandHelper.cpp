@@ -563,7 +563,7 @@ void CommandHelper::list()
 	int size;
 	recv(connFd, &size, sizeof(int), 0);
 	#define COLOR "\033[32m\033[1m\033[45m"
-	fprintf(stderr, COLOR "enrolled users:\n\n" RESET);
+	fprintf(stderr, COLOR "enrolled users:" RESET "\n\n");
 	#undef COLOR
 	while (size--) {
 		char isOnline = false;
