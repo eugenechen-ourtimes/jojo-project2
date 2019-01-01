@@ -472,6 +472,7 @@ void CommandHelper::sendFile(string target, string arg)
 		else	if (S_ISLNK(buffer.st_mode))	t_str = "symbolic link";
 		else									t_str = "unknown mode!";
 		fprintf(stderr, "file type: " RED "%s" RESET ", this is not allowed to upload\n", t_str.c_str());
+		free(path);
 		return;
 	}
 
