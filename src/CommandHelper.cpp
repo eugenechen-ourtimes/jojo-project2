@@ -456,7 +456,6 @@ void CommandHelper::sendFile(string target, string arg)
 	char *path = (char *)malloc(pathLen + 1);
 	strcpy(path, arg.c_str());
 
-	/* TODO check regular file */
 	struct stat buffer;
 	if (stat(path, &buffer) < 0) {
 		perror("stat");
