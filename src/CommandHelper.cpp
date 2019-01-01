@@ -457,6 +457,24 @@ void CommandHelper::sendFile(string target, string arg)
 	strcpy(path, arg.c_str());
 
 	/* TODO check regular file */
+	struct stat buffer;
+	if (stat(path, &buffer) < 0) {
+		perror("stat");
+		free(path);
+		return;
+	}
+
+	if (!S_ISREG(buffer.st_mode)) {
+		string t_str;
+				if (S_ISDIR(buffer.st_mode))	t_str = "directory";
+		else	if (S_ISCHR(buffer.st_mode))	t_str = "character special";
+		else	if (S_ISBLK(buffer.st_mode))	t_str = "block special";
+		else	if (S_ISFIFO(buffer.st_mode))	t_str = "fifo";
+		else	if (S_ISLNK(buffer.st_mode))	t_str = "symbolic link";
+		else									t_str = "unknown mode!";
+		fprintf(stderr, "file type: " RED "%s" RESET ", this is not allowed to upload\n", t_str.c_str());
+		return;
+	}
 
 	FILE *fp = fopen(path, "rb");
 	if (fp == NULL) {
