@@ -8,6 +8,7 @@
 #define MAG   "\033[35m"
 #define CYN   "\033[36m"
 #define WHT   "\033[37m"
+#define BOLD  "\033[1m"
 #define RESET "\033[0m"
 
 #endif

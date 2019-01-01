@@ -107,15 +107,38 @@ void SignUpHelper::refresh()
 {
 	string username = getUsername();
 	string password = getPassword();
-	fprintf(stderr, "    Username:     %15s #Make sure Username is no more than %2d characters\n",
+
+	if (!username.empty()) 
+		fprintf(stderr, usernameValid() ? GRN: RED);
+	fprintf(stderr, "    Username:     ");
+	if (!username.empty())
+		fprintf(stderr, RESET);
+
+	fprintf(stderr, "%15s #Make sure Username is no more than %2d characters\n",
 		username.empty() ? strEmpty.c_str(): username.c_str(),
-		usernameMaxLength);
+		usernameMaxLength
+		);
 
-	fprintf(stderr, "    Password:     %15s #Make sure Password is no less than %2d characters\n",
+
+	if (!password.empty())
+		fprintf(stderr, passwordValid() ? GRN: RED);
+	fprintf(stderr, "    Password:     ");
+	if (!password.empty())
+		fprintf(stderr, RESET);
+
+	fprintf(stderr, "%15s #Make sure Password is no less than %2d characters\n",
 		password.empty() ? strEmpty.c_str(): strHidden.c_str(),
-		passwordMinLength);
+		passwordMinLength
+		);
 
-	fprintf(stderr, "    Confirm Password: %15s\n",
+
+	if (!confirmPassword.empty())
+		fprintf(stderr, passwordMatched() ? GRN: RED);
+	fprintf(stderr, "    Confirm Password: ");
+	if (!confirmPassword.empty())
+		fprintf(stderr, RESET);
+
+	fprintf(stderr, "%15s\n",
 		confirmPassword.empty() ? strEmpty.c_str(): strHidden.c_str());
 
 	if (usernameTooLong()) {
@@ -154,9 +177,11 @@ void SignUpHelper::refresh()
 	}
 
 	if (formComplete()) {
-		fprintf(stderr, GRN "=> Ready to create account \n" RESET);
+		#define COLOR "\033[36m\033[1m"
+		fprintf(stderr, COLOR "=> Ready to create account \n" RESET);
+		#undef COLOR
 	}
 
-	fprintf(stderr,"\nStart with an instruction\n");
-	fprintf(stderr,"\033[33m\033[1m\\create-account   \\username [%s]   \\password   \\confirm-password   \\help    \\cancel \033[0m\n","%s");
+	fprintf(stderr,"\n" "    " BOLD "One account. Meet all your friends at Chatroom\n" RESET);
+	fprintf(stderr,     "    " "\033[33m\033[1m\\username [%s]   \\password   \\confirm-password   \\cancel   \\create-account   \\help\033[0m\n","%s");
 }

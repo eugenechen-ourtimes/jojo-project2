@@ -10,7 +10,6 @@
 #include "common.hpp"
 #include <dirent.h>
 #include <sys/stat.h>
-#include <iostream>
 #define PasswordBuffer 1024
 
 
@@ -45,52 +44,42 @@ class CommandHelper {
 			setState(state);
 			signUpHelper.setFd(connFd);
 			memset(storedPassword, '\0', PasswordBuffer);
-			showHomePage();
+			refresh();
 		}
 
 		void help()
 		{
-			fprintf(stderr, "\033[33m\033[1m\\refresh\033[0m to refresh your web page\n");
+			fprintf(stderr, "input \033[33m\033[1m\\refresh\033[0m to refresh your web page\n");
 			showLocalCommands();
 		}
 
 		void showLocalCommands()
 		{
 			if (state == ::HOME) {
-				fprintf(stderr, "input \033[33m\033[1m\\sign-up\033[0m to enter the signup page.\n\n");
-				fprintf(stderr, "input \033[33m\033[1m\\login\033[0m to login.\n\n");
-				fprintf(stderr, "input \033[33m\033[1m\\quit\033[0m to leave the application.\n\n");
+				fprintf(stderr, "\ninput \033[33m\033[1m\\sign-up\033[0m to enter the signup page\n");
+				fprintf(stderr, "\ninput \033[33m\033[1m\\login\033[0m to log in\n");
+				fprintf(stderr, "\ninput \033[33m\033[1m\\quit\033[0m to leave the application\n");
 				return;
 			}
 
 			if (state == ::REGISTER) {
-				fprintf(stderr, "input \033[33m\033[1m\\username [username]\033[0m to register account with the username.\n\n");
-				fprintf(stderr, "input \033[33m\033[1m\\password\033[0m to set the password. To execute this instruction, the username must be set.\n\n");
+				fprintf(stderr, "\ninput \033[33m\033[1m\\username [username]\033[0m to register account with [username]\n");
+				fprintf(stderr, "\ninput \033[33m\033[1m\\password\033[0m to set the password; to execute this instruction, the username must be set.\n");
 
-				fprintf(stderr, "input \033[33m\033[1m\\confirm-password\033[0m to confirm the password. Password should be set before.\n\n");
-				fprintf(stderr, "input \033[33m\033[1m\\cancel\033[0m to cancel sign up and return to previous page.\n\n");
-				fprintf(stderr, "input \033[33m\033[1m\\create-account\033[0m you can create the account successfully if username, password, confirm-password had been correctly set.\n\n");
+				fprintf(stderr, "\ninput \033[33m\033[1m\\confirm-password\033[0m to confirm your password; Password should be set before.\n");
+				fprintf(stderr, "\ninput \033[33m\033[1m\\cancel\033[0m to cancel sign up and return to previous page\n");
+				fprintf(stderr, "\ninput \033[33m\033[1m\\create-account\033[0m: you can create the account successfully if username, password, and confirm-password have been correctly set\n");
 				return;
 			}
 
 			if (state == ::ONLINE) {
-				fprintf(stderr,"input \033[33m\033[1m \\send [-m] [ID] 'message' \033[0mto send a message to a specific ID. Message transmitting is the default action of \033[33m\033[1m\\send\033[0m, so [-m] is optional\n\n");
-				fprintf(stderr,"input \033[33m\033[1m \\send [-f] [ID] 'filename' \033[0mto send a file to a specific ID. Make sure you have specify -f for file sending\n\n");
-				fprintf(stderr,"input \033[33m\033[1m \\list \033[0mto ask a list of ID which has enrolled on the Chatroom.\n\n");
-				fprintf(stderr,"input \033[33m\033[1m \\history \033[0mto check previous message.\n\n");	
-				fprintf(stderr,"input \033[33m\033[1m \\download-list \033[0mto check the files available for downloading.\n\n");
-				fprintf(stderr,"input \033[33m\033[1m \\download [filename]\033[0m to download the corresponding file.\n\n");
-				fprintf(stderr,"input \033[33m\033[1m \\logout \033[0mto logout and go back to initial login menu.\n\n");				
-
-				/*
-				fprintf(stderr, "** \\list [-a]\n"
-								"      List online users\n"
-								"      List all users if [-a] specified\n");
-				fprintf(stderr, "** \\send -m [message] [username]\n"
-								"      Send message\n");
-				fprintf(stderr, "** \\send -f [path] [username]\n"
-								"      Send file\n");
-				*/			
+				fprintf(stderr,"\ninput \033[33m\033[1m\\send [-m] [ID] \'message\' \033[0mto send a message to a specific ID; message transmitting is the default action of \033[33m\033[1m\\send\033[0m, so [-m] is optional.\n");
+				fprintf(stderr,"\ninput \033[33m\033[1m\\send [-f] [ID] \'filename\' \033[0mto send a file to a specific ID; make sure you have specify \'-f\' for file sending.\n");
+				fprintf(stderr,"\ninput \033[33m\033[1m\\list\033[0m to get a list of person who has signed up for Chatroom\n");
+				fprintf(stderr,"\ninput \033[33m\033[1m\\history\033[0m to view previous message\n");	
+				fprintf(stderr,"\ninput \033[33m\033[1m\\download-list\033[0m to view the files available for downloading\n");
+				fprintf(stderr,"\ninput \033[33m\033[1m\\download [filename]\033[0m to download the corresponding file\n");
+				fprintf(stderr,"\ninput \033[33m\033[1m\\logout\033[0m to log out and go back to initial login menu\n");
 			}
 		}
 
@@ -104,14 +93,10 @@ class CommandHelper {
 				signUpHelper.refresh();
 				return;
 			}
-			if (state == ::ONLINE){
+			if (state == ::ONLINE) {
 				showOnlinePage();
-				return ;
+				return;
 			}
-			
-			fprintf(stderr, "refresh chat room\n");
-			/* TODO question: how do we refresh in chat room ? */
-
 		}
 
 		void signUp()
@@ -148,8 +133,8 @@ class CommandHelper {
 			fgets(line, 64, stdin);
 			sscanf(line, "%s", username);
 			if(!strcmp(username,"\\return")){
-				refresh() ;
-				return  ;
+				refresh();
+				return;
 			}
 
 			char* password;
@@ -167,10 +152,9 @@ class CommandHelper {
 					perror(savedPasswordPath.c_str());
 					exit(-1);
 				}
-				/*perror(savedPasswordPath.c_str());*/
 				fprintf(stderr,"Please key in your password or input \033[33m\033[1m\\return \033[0m to exit\n");
 				password = getpass("Input your password: ");
-				if (!strcmp(password,"\\return")){
+				if (!strcmp(password,"\\return")) {
 					refresh();
 					return;
 				}
@@ -196,7 +180,7 @@ class CommandHelper {
 					savePassword(savedPasswordPath.c_str(), password);
 				}
 				refresh();
-				return ;
+				return;
 			}
 
 			if (result == UsernameDoesNotExist) {
@@ -389,30 +373,6 @@ class CommandHelper {
 			fprintf(stderr, "server seems to disconnect\n");
 		}
 
-		void list()
-		{
-			Command command = ::listUsers;
-			send(connFd, &command, sizeof(int), 0);
-			int size;
-			bool permit = false;
-			recv(connFd, &permit, sizeof(bool), 0);
-			if (!permit) {
-				fprintf(stderr, "list request rejected (state is not ONLINE)\n");
-				return;
-			}
-
-			recv(connFd, &size, sizeof(int), 0);
-			fprintf(stderr, "\033[32m\033[1m\033[45menrolled users:\033[0m\n\n");
-			while (size--) {
-				int usernameLen;
-				char username[32];
-				recv(connFd, &usernameLen, sizeof(int), 0);
-				recv(connFd, username, usernameLen, 0);
-				username[usernameLen] = '\0';
-				fprintf(stderr,"* %s\n", username);
-			}
-		}
-
 		void sendData(string option, string targetUserName, string content)
 		{
 			if (state != ::ONLINE) {
@@ -471,7 +431,7 @@ class CommandHelper {
 			char *path = (char *)malloc(pathLen + 1);
 			strcpy(path, arg.c_str());
 
-			/* check regular file */
+			/* TODO check regular file */
 
 			FILE *fp = fopen(path, "rb");
 			if (fp == NULL) {
@@ -563,22 +523,27 @@ class CommandHelper {
 			fclose(fp); free(path); free(ts1); free(ts2);
 		}
 
-		void logout()
+		void list()
 		{
-			Command command = ::logout;
-            assert(send(connFd, &command, sizeof(int), 0) == sizeof(int));
-			int usernameLen = username.length();
-			assert(send(connFd, &usernameLen, sizeof(int), 0) == sizeof(int));
-			if (usernameLen > 0)
-				assert(send(connFd, username.c_str(), usernameLen, 0) == usernameLen);
-			bool ack = true;
-			recv(connFd, &ack, sizeof(bool), 0);
-			if (ack) {
-				setState(::HOME);
-				setUsername("");
-				refresh();
-			} else {
-				fprintf(stderr, "username incorrect\n");
+			Command command = ::listUsers;
+			send(connFd, &command, sizeof(int), 0);
+			int size;
+			bool permit = false;
+			recv(connFd, &permit, sizeof(bool), 0);
+			if (!permit) {
+				fprintf(stderr, "list request rejected (state is not ONLINE)\n");
+				return;
+			}
+
+			recv(connFd, &size, sizeof(int), 0);
+			fprintf(stderr, "\033[32m\033[1m\033[45menrolled users:\033[0m\n\n");
+			while (size--) {
+				int usernameLen;
+				char username[32];
+				recv(connFd, &usernameLen, sizeof(int), 0);
+				recv(connFd, username, usernameLen, 0);
+				username[usernameLen] = '\0';
+				fprintf(stderr,"* %s\n", username);
 			}
 		}
 
@@ -657,32 +622,6 @@ class CommandHelper {
 			#undef COLOR
 		}
 
-		void setState(State state)
-		{
-			this->state = state;
-		}
-
-		State getState()
-		{
-			return state;
-		}
-
-		void setUsername(string username)
-		{
-			this->username = username;
-		}
-		
-		void download(string arg1, string arg2) {
-			if (state != ::ONLINE) {				
-				promptStateIncorrect();
-				return ;
-			}
-
-			downloadRequest(arg1, arg2);
-			return;
-		}
-
-
 		void showDownloadList(const char *arg)
 		{
 			string downloadListPath = downloadListFolder + getUsername();
@@ -714,7 +653,6 @@ class CommandHelper {
 			while (fscanf(fp, "%s%s", name, time_cstr) != EOF) {
 				q.push( pair < string, string > (string(name), string(time_cstr)) );
 				if (q.size() > bufSize) q.pop();
-				/*fprintf(stderr, "\033[33m\033[1m%s\033[0m\t%s\n", name, time_cstr);*/
 			}
 
 			while (!q.empty()) {
@@ -729,7 +667,15 @@ class CommandHelper {
 			fclose(fp);
 		}
 
+		void download(string arg1, string arg2) {
+			if (state != ::ONLINE) {				
+				promptStateIncorrect();
+				return ;
+			}
 
+			downloadRequest(arg1, arg2);
+			return;
+		}
 
 		void downloadRequest(string filename, string timeStr)
 		{
@@ -796,6 +742,40 @@ class CommandHelper {
 			fprintf(stderr, "%s downloaded\n", filename.c_str());
 		}
 
+		void logout()
+		{
+			Command command = ::logout;
+            assert(send(connFd, &command, sizeof(int), 0) == sizeof(int));
+			int usernameLen = username.length();
+			assert(send(connFd, &usernameLen, sizeof(int), 0) == sizeof(int));
+			if (usernameLen > 0)
+				assert(send(connFd, username.c_str(), usernameLen, 0) == usernameLen);
+			bool ack = true;
+			recv(connFd, &ack, sizeof(bool), 0);
+			if (ack) {
+				setState(::HOME);
+				setUsername("");
+				refresh();
+			} else {
+				fprintf(stderr, "username incorrect\n");
+			}
+		}
+
+		void setState(State state)
+		{
+			this->state = state;
+		}
+
+		State getState()
+		{
+			return state;
+		}
+
+		void setUsername(string username)
+		{
+			this->username = username;
+		}
+
 		string getUsername()
 		{
 			return username;
@@ -811,7 +791,6 @@ class CommandHelper {
 		State state;
 		string username;
 		SignUpHelper signUpHelper;
-		//vector < string > downloadList ;
 
 		void promptReturningToHomePage() {
 			fprintf(stderr, "returning to home page ...\n%s\n", del);
@@ -819,23 +798,18 @@ class CommandHelper {
 
 		void showHomePage()
 		{
-			//fprintf(stderr, "Welcome to Home Page\n");
-			//fprintf(stderr, "Options:\n");
-			//fprintf(stderr, "** Sign Up\n");
-			//fprintf(stderr, "** Log In\n");
-			//fprintf(stderr, "**  Quit \n");
 			fprintf(stderr,"\t*===========================*\n");
 			fprintf(stderr,"\t*=                         =*\n");
 			fprintf(stderr,"\t*= \033[5mWelcome to Chatroom 1.0 \033[0m=*\n");	
 			fprintf(stderr,"\t*=                         =*\n");
 			fprintf(stderr,"\t*===========================*\n\n");
 			fprintf(stderr,"\tStart with an instruction\n");
-			fprintf(stderr,"\t\033[33m\033[1m\\login     \\sign-up    \\help    \\quit \033[0m\n");
+			fprintf(stderr,"\t\033[33m\033[1m\\sign-up    \\login    \\quit    \\help \n\033[0m");
 		}
 
 		void showOnlinePage()
 		{
-			printf("\n\tHello \033[32m\033[1m\033[5m%s\033[0m >< How are you ?\n", username.c_str());
+			printf("\n\tHello \033[32m\033[1m\033[5m%s\033[0m >< How are you ?\n", username.empty() ? "[anonymous]": username.c_str());
 			printf("\t\033[33m\033[1m\\send     \\list     \\history    \\download-list\033[0m\n");		
 			fprintf(stderr,"\t\033[33m\033[1m\\download    \\help    \\logout\033[0m\n");
 		}
@@ -844,7 +818,6 @@ class CommandHelper {
 const string CommandHelper::strEmpty = "[Empty]";
 const string CommandHelper::strHidden = "[Hidden]";
 const string CommandHelper::savedPasswordFolder = "../data/client/pass/";
-//const string CommandHelper::savedDownloadFolder = "../data/client/download";
 const string CommandHelper::downloadFolder = "../data/client/download/";
 const string CommandHelper::downloadListFolder = "../data/client/downloadList/";
 

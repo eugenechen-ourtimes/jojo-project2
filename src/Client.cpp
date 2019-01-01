@@ -1,5 +1,4 @@
-const char *del = "--------------------";
-const char *reset = "\033[0m";
+const char *del = "-----------------------------------------------";
 const char *arrow[2] = {"=>", "->"};
 #include <stdio.h>
 #include <stdlib.h>
@@ -147,20 +146,7 @@ class Client {
 				return;
 			}
 			
-			if (strCommand == CommandHelper::LIST) {
-				helper.list();
-				return;
-			}
-
 			if (strCommand == CommandHelper::SEND) {
-				/*	send	-m/-f	username	message/filename
-					arg0	arg1	arg2		arg3
-
-					send	username	message
-					arg0	arg1		arg2	
-
-					sendData(option, targetUserName, content) */
-
 				if (ret < 3) {
 					fprintf(stderr, "format error! Please input \033[33m\033[1m\\help\033[0m to make sure the format.\n");
 					return;
@@ -175,8 +161,8 @@ class Client {
 				return;
 			}
 
-			if (strCommand == CommandHelper::LOGOUT) {
-				helper.logout();
+			if (strCommand == CommandHelper::LIST) {
+				helper.list();
 				return;
 			}
 
@@ -186,6 +172,11 @@ class Client {
 					return;
 				}
 				helper.history((ret == 1) ? NULL: arg1);
+				return;
+			}
+
+			if (strCommand == CommandHelper::DOWNLOADLIST) {
+				helper.showDownloadList((ret == 1) ? NULL: arg1);
 				return;
 			}
 
@@ -203,9 +194,9 @@ class Client {
 				helper.download(string(arg1), (ret == 2) ? "": string(arg2));
 				return;
 			}
-
-			if (strCommand == CommandHelper::DOWNLOADLIST) {
-				helper.showDownloadList((ret == 1) ? NULL: arg1);
+			
+			if (strCommand == CommandHelper::LOGOUT) {
+				helper.logout();
 				return;
 			}
 		}
