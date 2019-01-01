@@ -72,9 +72,9 @@ typedef struct Option {
  *				on the command line is interpreted as a
  *				"double" and that value is assigned to the
  *				option's associated variable.
- *	OPT_TIME -		if the flag is present then the next argument 
- *				on the command line is interpreted as a date 
- *				and time.  The corresponding time value 
+ *	OPT_TIME -		if the flag is present then the next argument
+ *				on the command line is interpreted as a date
+ *				and time.  The corresponding time value
  *				(number of seconds past the epoch) is assigned
  *				to the option's associated variable.
  *	OPT_FUNC -		if the flag is present, pass the next argument
@@ -139,7 +139,7 @@ typedef struct Option {
  * Exported procedures:
  */
 
-int Opt_Parse _ARGS_ ((int argc, char *argv[], Option *optionArray, 
+int Opt_Parse _ARGS_ ((int argc, char *argv[], Option *optionArray,
 		       int numOptions, int flags));
 
 void Opt_PrintUsage _ARGS_ ((char *commandName, Option *optionArray,

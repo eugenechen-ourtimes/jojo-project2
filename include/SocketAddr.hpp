@@ -4,10 +4,10 @@
 #include <string>
 using namespace std;
 static char *host = (char *)"localhost";
-static unsigned port = 3000; 
+static unsigned port = 3000;
 class SocketAddr: pair < string, unsigned > {
 	public:
-		/* 
+		/*
 		 *	first: string host (ip or hostname both ok)
 		 *	second: unsigned port
 		 */
@@ -17,8 +17,8 @@ class SocketAddr: pair < string, unsigned > {
 		}
 
 		SocketAddr(string host, unsigned port): pair < string, unsigned > (host, port)
-		{	
-			
+		{
+
 		}
 
 		inline string host() const
@@ -26,7 +26,7 @@ class SocketAddr: pair < string, unsigned > {
 			return first;
 		}
 
-		inline unsigned port() const 
+		inline unsigned port() const
 		{
 			return second;
 		}

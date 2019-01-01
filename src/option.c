@@ -53,7 +53,7 @@ static void ParseTime _ARGS_ ((char *progName, char *str,
  *
  * Side effects:
  *	The variables referenced from the option array get modified
- *	if their option was present on the command line.  Can clobber 
+ *	if their option was present on the command line.  Can clobber
  *	the global buffer used by localtime(3).
  *
  *----------------------------------------------------------------------
@@ -193,7 +193,7 @@ Opt_Parse(argc, argv, optionArray, numOptions, flags)
 			    if (argc == 0) {
 				OptNoArg(argv[0], optionPtr->key);
 			    } else {
-				ParseTime(argv[0], *curArg, 
+				ParseTime(argv[0], *curArg,
 					  (time_t *)optionPtr->address);
 				curArg++;
 				argc--;
@@ -231,7 +231,7 @@ Opt_Parse(argc, argv, optionArray, numOptions, flags)
 			    int (*handlerProc)();
 
 			    handlerProc = (int (*)())optionPtr->address;
-			    
+
 			    if ((* handlerProc) (optionPtr->key, *curArg)) {
 				curArg += 1;
 				argc -= 1;
@@ -381,11 +381,11 @@ Opt_PrintUsage(commandName, optionArray, numOptions)
  *
  * ParseTime --
  *
- *	Convert a date and time from some string representation to 
+ *	Convert a date and time from some string representation to
  *	something we can compute with.
  *
  * Results:
- *	If str points to a parsable time, the corresponding UNIX time 
+ *	If str points to a parsable time, the corresponding UNIX time
  *	value (seconds past the epoch) is returned through resultPtr.
  *
  * Side effects:
@@ -404,13 +404,13 @@ ParseTime(progName, str, resultPtr)
     char *endPtr;		/* pointer into str, for parsing */
     struct tm pieces;		/* year, month, etc. as integers */
 
-    /* 
+    /*
      * We currently accept the following formats:
-     * 
+     *
      * (1) an integer number of seconds past the epoch.
      * (2) a string of the form "yy.mm.dd.hh.mm.ss"
      */
-    
+
     result = strtol(str, &endPtr, 0);
     if (endPtr == str) {
 	goto parseError;
@@ -420,8 +420,8 @@ ParseTime(progName, str, resultPtr)
 	return;
     }
 
-    /* 
-     * Not a simple integer, so try form 2. 
+    /*
+     * Not a simple integer, so try form 2.
      */
     if (*endPtr != '.') {
 	goto parseError;

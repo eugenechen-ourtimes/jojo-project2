@@ -53,7 +53,7 @@ void SignUpHelper::handleInputUsername(string username)
 		::send(connFd, &usernameLen, sizeof(int), 0);
 		::send(connFd, getUsername().c_str(), usernameLen, 0);
 		::recv(connFd, &usernameTaken, sizeof(bool), 0);
-	} 
+	}
 }
 
 void SignUpHelper::handleInputPassword(string password)
@@ -92,12 +92,12 @@ CreateAccountResult SignUpHelper::createAccount()
 
 	::send(connFd, &usernameLen, sizeof(int), 0);
 	::send(connFd, getUsername().c_str(), usernameLen, 0);
-	
+
 	::send(connFd, &passwordLen, sizeof(int), 0);
 	::send(connFd, getPassword().c_str(), passwordLen, 0);
 	CreateAccountResult result = Undefined;
 	::recv(connFd, &result, sizeof(int), 0);
-	
+
 	if (result == UsernameTaken) {
 		usernameTaken = true;
 	}
@@ -109,7 +109,7 @@ void SignUpHelper::refresh()
 	string username = getUsername();
 	string password = getPassword();
 
-	if (!username.empty()) 
+	if (!username.empty())
 		fprintf(stderr, usernameValid() ? GRN: RED);
 	fprintf(stderr, "    Username:     ");
 	if (!username.empty())

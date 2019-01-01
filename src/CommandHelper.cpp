@@ -117,27 +117,27 @@ void CommandHelper::showLocalCommands()
 			" to send a file to a specific ID; make sure you have specify \'-f\' for file sending.\n",
 			SEND.c_str()
 			);
-		
+
 		fprintf(stderr,"\ninput " BYEL "%s"    RESET
 			" to get a list of person who has signed up for Chatroom\n",
 			LIST.c_str()
 			);
-		
+
 		fprintf(stderr,"\ninput " BYEL "%s" RESET
 			" to view previous message\n",
 			HISTORY.c_str()
-			);	
-		
+			);
+
 		fprintf(stderr,"\ninput " BYEL "%s"       RESET
 			" to view the files available for downloading\n",
 			DOWNLOADLIST.c_str()
 			);
-		
+
 		fprintf(stderr,"\ninput " BYEL "%s"" [filename]" RESET
 			" to download the corresponding file\n",
 			DOWNLOAD.c_str()
 			);
-		
+
 		fprintf(stderr,"\ninput " BYEL "%s"  RESET
 			" to log out and go back to initial login menu\n",
 			LOGOUT.c_str()
@@ -218,7 +218,7 @@ void CommandHelper::login()
 			return;
 		}
 	}
-	
+
 	Command command = ::login;
 
 	send(connFd, &command, sizeof(int), 0);
@@ -235,7 +235,7 @@ void CommandHelper::login()
 		fprintf(stderr, GRN "=> login successful\n" RESET);
 		setUsername(string(username));
 		setState(::ONLINE);
-		if (!passwordFileAccessible) 
+		if (!passwordFileAccessible)
 			savePassword(savedPasswordPath.c_str(), password);
 		refresh();
 		return;
@@ -243,7 +243,7 @@ void CommandHelper::login()
 
 	if (result == UsernameDoesNotExist) {
 		fprintf(stderr, YEL "=> username does not exist\n" RESET);
-		if (passwordFileAccessible) 
+		if (passwordFileAccessible)
 			unlink(savedPasswordPath.c_str());
 		refresh();
 		return;
@@ -251,7 +251,7 @@ void CommandHelper::login()
 
 	if (result == PasswordIncorrect) {
 		fprintf(stderr, RED "=> password incorrect\n" RESET);
-		if (passwordFileAccessible) 
+		if (passwordFileAccessible)
 			unlink(savedPasswordPath.c_str());
 		refresh();
 		return;
@@ -397,7 +397,7 @@ void CommandHelper::createAccount()
 		signUpHelper.reset();
 		showHomePage();
 		return;
-	} 
+	}
 
 	fprintf(stderr, "server seems to disconnect\n");
 }
@@ -508,7 +508,7 @@ void CommandHelper::sendFile(string target, string arg)
 		fclose(fp); free(path); free(ts1); free(ts2);
 		return;
 	}
-	
+
 	send(connFd, &targetLen, sizeof(int), 0);
 	send(connFd, target.c_str(), targetLen, 0);
 
@@ -529,7 +529,7 @@ void CommandHelper::sendFile(string target, string arg)
 	send(connFd, &sz, 8, 0);
 	char permit = false;
 	recv(connFd, &permit, 1, 0);
-	
+
 	if (permit) {
 		while (sz > 0) {
 			size = (sz < IOBufSize) ? sz: IOBufSize;
@@ -552,7 +552,7 @@ void CommandHelper::list()
 {
 	Command command = ::listUsers;
 	send(connFd, &command, sizeof(int), 0);
-	
+
 	char permit = false;
 	recv(connFd, &permit, 1, 0);
 	if (!permit) {
@@ -566,12 +566,20 @@ void CommandHelper::list()
 	fprintf(stderr, COLOR "enrolled users:\n\n" RESET);
 	#undef COLOR
 	while (size--) {
+		char isOnline = false;
 		int usernameLen;
 		char username[32];
+		recv(connFd, &isOnline, 1, 0);
 		recv(connFd, &usernameLen, sizeof(int), 0);
 		recv(connFd, username, usernameLen, 0);
 		username[usernameLen] = '\0';
+
+		#define COLOR "\033[36m\033[1m"
+		if (isOnline)
+			fprintf(stderr, COLOR);
 		fprintf(stderr,"* %s\n", username);
+		if (isOnline)
+			fprintf(stderr, RESET);
 	}
 }
 
@@ -627,18 +635,18 @@ void CommandHelper::history(const char *arg)
 		recv(connFd, line, L, 0);
 
 		line[L] = '\0';
-		
+
 		type = Zero;
-		
+
 		sscanf(line, "%s%s%s%d%s", srcUser, dstUser, content, &type, time_cstr);
 		if (type != Message && type != File) {
 			fprintf(stderr, "Unknown type %d\n", type);
 			continue;
 		}
-		
+
 		int isFile = (type == File) ? 1: 0;
 
-		fprintf(stderr, COLOR "%s" RESET " %s " COLOR "%s" RESET " %s\t%s\n", 
+		fprintf(stderr, COLOR "%s" RESET " %s " COLOR "%s" RESET " %s\t%s\n",
 			srcUser,
 			arrow[isFile],
 			dstUser,
@@ -666,7 +674,7 @@ void CommandHelper::showDownloadList(const char *arg)
 	fprintf(stderr,"\ninput " BYEL "%s [%s]" RESET " to require downloading a file.\n",
 		DOWNLOAD.c_str(),
 		"%s");
-	
+
 	char name[64];
 	char time_cstr[32];
 	queue < pair < string, string > > q;
@@ -700,14 +708,14 @@ void CommandHelper::showDownloadList(const char *arg)
 void CommandHelper::downloadRequest(string filename, string timeStr)
 {
 	fprintf(stderr, "file requesting\n");
-			
+
 	Command command = ::download;
 	send(connFd, &command, sizeof(int), 0);
 	int usernameLen = username.length(), filenameLen = filename.length();
 	int timeStrLen = timeStr.length();
 	send(connFd, &usernameLen, sizeof(int), 0);
 	send(connFd, username.c_str(), usernameLen, 0);
-	
+
 	char a1 = false;
 	recv(connFd, &a1, 1, 0);
 	if (!a1) {
@@ -725,14 +733,14 @@ void CommandHelper::downloadRequest(string filename, string timeStr)
 
 	int permit;
 	recv(connFd, &permit, sizeof(int), 0);
-	
+
 	if (!permit) {
 		fprintf(stderr, "File not exist.\n");
 		return;
 	}
-	
+
 	string selfDownloadFolder = downloadFolder + username + "/";
-	
+
 	mkdirIfNotExist(selfDownloadFolder.c_str());
 
 	string downloadFilePath = selfDownloadFolder + filename;
@@ -816,7 +824,7 @@ void CommandHelper::showHomePage()
 {
 	fprintf(stderr,"\t"      "*===========================*\n");
 	fprintf(stderr,"\t"      "*=                         =*\n");
-	fprintf(stderr,"\t"      "*= \033[5mWelcome to Chatroom 1.0 \033[0m=*\n");	
+	fprintf(stderr,"\t"      "*= \033[5mWelcome to Chatroom 1.0 \033[0m=*\n");
 	fprintf(stderr,"\t"      "*=                         =*\n");
 	fprintf(stderr,"\t"      "*===========================*\n\n");
 	fprintf(stderr,"\t"      "Start with an instruction\n");
@@ -840,7 +848,7 @@ void CommandHelper::showOnlinePage()
 		LIST.c_str(),
 		HISTORY.c_str(), "%d",
 		DOWNLOADLIST.c_str(), "%d"
-		);		
+		);
 	fprintf(stderr,      "\t" BYEL "%s [%s] [%s] %s         %s\n" RESET,
 		DOWNLOAD.c_str(), "file", "time",
 		LOGOUT.c_str(),

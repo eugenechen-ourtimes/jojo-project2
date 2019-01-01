@@ -2,7 +2,7 @@
  * cfuncproto.h --
  *
  *	Declarations of a macro supporting Ansi-C function prototypes in
- *	Sprite. This macro allow function prototypes to be defined 
+ *	Sprite. This macro allow function prototypes to be defined
  *	such that the code works on both standard and K&R C.
  *
  * Copyright 1990 Regents of the University of California
@@ -21,7 +21,7 @@
 #define _CFUNCPROTO
 
 /*
- * Definition of the _ARGS_ macro.  The _ARGS_ macro such be used to 
+ * Definition of the _ARGS_ macro.  The _ARGS_ macro such be used to
  * enclose the argument list of a function prototype.  For example, the
  * function:
  * extern int main(argc, argv)
@@ -43,13 +43,13 @@
 
 #if defined(__cplusplus)
 #define _EXTERN         extern "C"
-#define _NULLARGS	(void) 
+#define _NULLARGS	(void)
 #define _HAS_PROTOTYPES
 #define _HAS_VOIDPTR
 #define _HAS_CONST
-#else 
+#else
 #define _EXTERN         extern
-#define _NULLARGS	() 
+#define _NULLARGS	()
 #endif
 
 #if defined(_HAS_PROTOTYPES) && !defined(lint)

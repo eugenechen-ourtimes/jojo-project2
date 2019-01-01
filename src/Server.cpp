@@ -39,14 +39,27 @@ static Option options[] = {
 char TimeUtils::time_cstr[32] = "";
 char TimeUtils::buffer[32] = "";
 
-template<typename KeyType, typename ValueType> 
+template<typename KeyType, typename ValueType>
 pair<KeyType,ValueType> maxValue(const map<KeyType,ValueType> &x)
 {
 	return *max_element(x.begin(), x.end(),
 	[] (const pair<KeyType,ValueType> & p1, const pair<KeyType,ValueType> & p2)
 	{
 		return p1.second < p2.second;
-	}); 
+	});
+}
+
+void safe_exit(int signo)
+{
+	if (signo != SIGINT && signo != SIGTERM && signo != SIGTSTP)
+		fprintf(stderr, "unexpected signal %d\n", signo);
+	fprintf(stderr,
+		(signo == SIGTERM) ?	"SIGTERM\n":
+		(signo == SIGINT) ?		"SIGINT\n":
+								"SIGTSTP\n"
+					);
+	exit(0);
+	/* by calling exit(0), buffer would be flushed out, all files would be closed */
 }
 
 class Server {
@@ -54,7 +67,7 @@ class Server {
 		static const int maxAccount = 1000;
 		static const int maxConnection = 256;
 		static const int maxLoginUsers = 30;
-		
+
 		static const string usersFileName;
 		static const string historyFolder;
 		static const string offlineFolder;
@@ -69,8 +82,8 @@ class Server {
 		map < SocketAddr, int > connections;	/* SocketAddr -> connFd */
 
 		map < string, int > onlineUsers;		/* username -> connFd */
-		map < int, State> states;				/* connFd -> State */				
-		
+		map < int, State> states;				/* connFd -> State */
+
 		map < string, string > credentials;		/* username -> password */
 
 		Server();
@@ -152,7 +165,7 @@ class Server {
 			DataType type,
 			string timeStr
 		);
-		void sendOfflineData(string username); 
+		void sendOfflineData(string username);
 };
 
 
@@ -169,6 +182,21 @@ const string Server::fileUploadFolder = "../data/server/files/";
 
 int main(int argc, char *argv[])
 {
+	struct sigaction sa;
+	sa.sa_handler = &safe_exit;
+	sa.sa_flags = SA_RESTART;
+	sigfillset(&sa.sa_mask);
+
+	bool sig = true;
+	if (sigaction(SIGINT, &sa, NULL) == -1)
+		fprintf(stderr, "can't catch SIGINT\n"), sig = false;
+	if (sigaction(SIGTERM, &sa, NULL) == -1)
+		fprintf(stderr, "can't catch SIGTERM\n"), sig = false;
+	if (sigaction(SIGTSTP, &sa, NULL) == -1)
+		fprintf(stderr, "can't catch SIGSTOP\n"), sig = false;
+
+	if (!sig) exit(0);
+
 	Opt_Parse(argc, argv, options, Opt_Number(options), 0);
 	Server server(port);
 	server.init();
@@ -214,7 +242,7 @@ void Server::checkConnections(CommandHandler &handler)
 				close(connFd);
 				FD_CLR(connFd, &readFds);
 				return;
-			} 
+			}
 
 			switch (command) {
 				case ::signUp:
@@ -420,7 +448,6 @@ void Server::CommandHandler::createAccount(int connFd)
 		fprintf(server.usersFile, "%s %s\n",
 			username,
 			hashedPassword.c_str());
-		fflush(server.usersFile);
 	}
 
 	send(connFd, &result, sizeof(int), 0);
@@ -444,7 +471,7 @@ void Server::CommandHandler::acceptQuit(const SocketAddr &socketAddr, int connFd
 
 	/* remove states */
 	server.states.erase(connFd);
-	
+
 	/* remove connection */
 	server.connections.erase(socketAddr);
 	close(connFd);
@@ -465,7 +492,7 @@ void Server::CommandHandler::handleLogin(int connFd)
 	recv(connFd, &usernameLen, sizeof(int), 0);
 	recv(connFd, username, usernameLen, 0);
 	username[usernameLen] = '\0';
-	
+
 	map < string, string > &credentials = server.credentials;
 	map < string, int > &onlineUsers = server.onlineUsers;
 
@@ -480,7 +507,7 @@ void Server::CommandHandler::handleLogin(int connFd)
 	if (it == credentials.end()) {
 		result = UsernameDoesNotExist;
 	} else {
-		if (string(md5Hash(string(password))) != it->second) 
+		if (string(md5Hash(string(password))) != it->second)
 			result = PasswordIncorrect;
 		else {
 			if (states[connFd] == ::ONLINE)
@@ -540,18 +567,21 @@ void Server::CommandHandler::handleListUsers(int connFd)
 {
 	/* only allow when state is ::ONLINE */
 	map < int, State >  &states = server.states;
+	map < string, int > &onlineUsers = server.onlineUsers;
 	char permit = states[connFd] == ::ONLINE ? 1: 0;
 	send(connFd, &permit, 1, 0);
 	if (!permit) return;
-	
+
 	map < string, string > &credentials = server.credentials;
 	int usersMapSize = credentials.size();
-	
+
 	send(connFd, &usersMapSize, sizeof(int), 0);
 
 	map < string, string >::iterator it;
 	for (it = credentials.begin(); it != credentials.end(); it++) {
+		char isOnline = (onlineUsers.find(it->first) != onlineUsers.end()) ? 1: 0;
 		int usernameLen = it->first.length();
+		send(connFd, &isOnline, 1, 0);
 		send(connFd, &usernameLen, sizeof(int), 0);
 		send(connFd, it->first.c_str(), usernameLen, 0);
 	}
@@ -562,12 +592,12 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 	char srcUser[64], dstUser[64], msg[256];
 	int srcLen, dstLen, msgLen;
 	map < string, int > &onlineUsers = server.onlineUsers;
-	map < string, string > &credentials = server.credentials; 
+	map < string, string > &credentials = server.credentials;
 
 	recv(connFd, &srcLen, sizeof(int), 0);
 	recv(connFd, srcUser, srcLen, 0);
 	srcUser[srcLen] = '\0';
-	
+
 	char a1 = (connFd == onlineUsers[string(srcUser)]) ? 1: 0;
 	send(connFd, &a1, 1, 0);
 
@@ -579,7 +609,7 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 
 	char a2 = (credentials.find(string(dstUser)) != credentials.end()) ? 1:-0;
 	send(connFd, &a2, 1, 0);
-	
+
 	if (!a2) return;
 
 	recv(connFd, &msgLen, sizeof(int), 0);
@@ -607,7 +637,7 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 
 	fprintf(fp, "%s %s %d\t%s\n", srcUser, msg, (int)type, time_cstr);
 	fclose(fp);
-	
+
 	server.saveHistory
 	(
 		string(srcUser),
@@ -626,7 +656,7 @@ void Server::CommandHandler::handleSendFile(int connFd)
 	char srcUser[64], dstUser[64], fileName[256];
 	int srcLen, dstLen, fileNameLen;
 	map < string, int > &onlineUsers = server.onlineUsers;
-	map < string, string > &credentials = server.credentials; 
+	map < string, string > &credentials = server.credentials;
 
 	recv(connFd, &srcLen, sizeof(int), 0);
 	recv(connFd, srcUser, srcLen, 0);
@@ -668,7 +698,7 @@ void Server::CommandHandler::handleSendFile(int connFd)
 
 	fprintf(async, "%s %s %d\t%s\n", srcUser, fileName, (int)type, time_cstr);
 	fclose(async);
-	
+
 	server.saveHistory
 	(
 		string(srcUser),
@@ -679,7 +709,7 @@ void Server::CommandHandler::handleSendFile(int connFd)
 	);
 
 	string dstUserDownloadFolder = fileUploadFolder + string(dstUser) + "/";
-	
+
 	mkdirIfNotExist(dstUserDownloadFolder.c_str());
 
 
@@ -705,7 +735,7 @@ void Server::CommandHandler::handleSendFile(int connFd)
 
 	char permit = true;
 	send(connFd, &permit, 1, 0);
-	
+
 	char buf[IOBufSize];
 	while (sz > 0) {
 		int32_t size = (sz < IOBufSize) ? sz: IOBufSize;
@@ -724,7 +754,7 @@ void Server::CommandHandler::handleSendFile(int connFd)
 		dstUser
 		);
 
-	if (onlineUsers.find(string(dstUser)) != onlineUsers.end()) 
+	if (onlineUsers.find(string(dstUser)) != onlineUsers.end())
 		server.sendOfflineData(string(dstUser));
 }
 
@@ -744,8 +774,8 @@ void Server::saveHistory
 	if (fp1 == NULL) {
 		perror(srcUserPath.c_str());
 		return;
-	}	
-	
+	}
+
 	fprintf(fp1, "%s %s %s %d\t%s\n",
 		srcUser.c_str(),
 		dstUser.c_str(),
@@ -795,7 +825,7 @@ void Server::CommandHandler::handleHistoryRequest(int connFd)
 
 	string userHistoryPath = historyFolder + string(user);
 	FILE *fp = fopen(userHistoryPath.c_str(), "r");
-	
+
 	char line[1024];
 	int lineCount;
 	if (fp == NULL) {
@@ -922,10 +952,10 @@ void Server::CommandHandler::handleDownloadRequest(int connFd)
 		recv(connFd, time_cstr, time_len, 0);
 
 	time_cstr[time_len] = '\0';
-	
+
 	int permit = 0;
 	string downloadFolder = fileUploadFolder + string(username) + "/";
-	
+
 	fprintf(stderr, "%s\n", downloadFolder.c_str());
 
 	string timeStr;
@@ -946,13 +976,13 @@ void Server::CommandHandler::handleDownloadRequest(int connFd)
 					exit(-1);
 				}
 				fprintf(stderr, "%s %s\n", prefix, postfix);
-				if (strcmp(filename, postfix) == 0 && strcmp(latest.c_str(), prefix) < 0) 
+				if (strcmp(filename, postfix) == 0 && strcmp(latest.c_str(), prefix) < 0)
 					latest = string(prefix);
 			}
 			closedir(dir);
 			if (!latest.empty()) timeStr = latest;
 		}
-		
+
 		if (timeStr.empty())
 			fprintf(stderr, "no such file or directory %s/%s\n", username, filename);
 	}

@@ -45,7 +45,7 @@ class Client {
 		void run()
 		{
 			CommandHelper helper(connFd, nowstate);
-			
+
 			fd_set read_set;
 			fd_set working_set;
 			FD_ZERO(&read_set);
@@ -58,7 +58,7 @@ class Client {
 
 				memcpy(&working_set, &read_set, sizeof(fd_set));
 				select(connFd + 1 , &working_set, NULL, NULL, NULL);
-				
+
 				if (FD_ISSET(STDIN_FILENO, &working_set)) {
 					handleStdin(helper);
 					fprintf(stderr, "> ");
@@ -82,9 +82,9 @@ class Client {
 			static char arg3[1000];
 
 			fgets(line, 1000, stdin);
-			
+
 			int ret = sscanf(line, "%s%s%s%s", arg0, arg1, arg2, arg3);
-			
+
 			if (ret <= 0) return;
 			string strCommand(arg0);
 
@@ -180,14 +180,14 @@ class Client {
 				helper.createAccount();
 				return;
 			}
-			
+
 			if (strCommand == CommandHelper::SEND) {
 				if (helper.getState() != ::ONLINE) {
 					helper.promptStateIncorrect();
 					return;
 				}
 				if (ret < 3) {
-					fprintf(stderr, "format error! input " BYEL "%s" RESET " to make sure the format\n", 
+					fprintf(stderr, "format error! input " BYEL "%s" RESET " to make sure the format\n",
 						CommandHelper::HELP.c_str()
 						);
 					return;
@@ -308,7 +308,7 @@ class Client {
 				int isFile = (type == File) ? 1: 0;
 
 				#define COLOR "\033[31m\033[1m"
-				
+
 				fprintf(stderr, COLOR "%s" RESET " %s %s\t%s\n",
 					fromUserName,
 					CommandHelper::arrow[isFile],
@@ -344,8 +344,8 @@ class Client {
 			struct addrinfo *result, *rp;
 			int status;
 			memset(&hints, 0, sizeof(struct addrinfo));
-			hints.ai_family = AF_INET;    
-    		hints.ai_socktype = SOCK_STREAM; 
+			hints.ai_family = AF_INET;
+    		hints.ai_socktype = SOCK_STREAM;
     		hints.ai_flags = 0;
     		hints.ai_addrlen = 0;
     		hints.ai_protocol = IPPROTO_TCP;
@@ -365,7 +365,7 @@ class Client {
 				if (::connect(fd, rp->ai_addr, rp->ai_addrlen) == 0) {
 					return fd;
 				}
-				
+
 				fprintf(stderr, "connect: %s\n", strerror(errno));
 				close(fd);
 				return -2;
