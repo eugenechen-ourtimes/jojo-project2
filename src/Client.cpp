@@ -19,6 +19,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include "color.hpp"
+#define TIMEOUT 20
 using namespace std;
 
 static Option options[] = {
@@ -30,16 +31,21 @@ class Client {
 	public:
 		static const State nowstate = ::HOME;
 		SocketAddr remote;
-		int connFd;
 
 		Client() {
-			connFd = connect();
+			connFd = connect(true);
 			if (connFd < 0) exit(-1);
 		}
 
 		Client(string host, unsigned port) {
 			remote = SocketAddr(host, port);
 			*this = Client();
+		}
+
+		int reconnect()
+		{
+			connFd = connect(false);
+			return connFd;
 		}
 
 		void run()
@@ -67,7 +73,10 @@ class Client {
 
 				if (FD_ISSET(connFd, &working_set)) {
 					fprintf(stderr, "\n");
-					handleDataFromServer(connFd, helper);
+					if (!handleDataFromServer(connFd, helper)) {
+						close(connFd);
+						return;
+					}
 					fprintf(stderr, "> ");
 				}
 			}
@@ -258,7 +267,7 @@ class Client {
 			fprintf(stderr, "no such command %s\n", strCommand.c_str());
 		}
 
-		void handleDataFromServer(int fd, CommandHelper &helper)
+		bool handleDataFromServer(int fd, CommandHelper &helper)
 		{
 			int numOfLines = -1;
 			char fromUserName[64], content[256];
@@ -270,7 +279,7 @@ class Client {
 			int ret = recv(fd, &numOfLines, sizeof(int), 0);
 			if (ret == 0) {
 				fprintf(stderr, "server disconnected\n");
-				exit(0);
+				return false;
 			}
 
 			bool hasFile = false;
@@ -328,10 +337,13 @@ class Client {
 			if (hasFile) {
 				fprintf(stderr, "input " BYEL DOWNLOAD " [filename]" RESET " to download files\n");
 			}
+
+			return true;
 		}
 
 	private:
-		int connect() {
+		int connFd;
+		int connect(bool first) {
 			struct addrinfo hints;
 			struct addrinfo *result, *rp;
 			int status;
@@ -347,7 +359,7 @@ class Client {
     		/* client do not need to know whether host is a hostname or ip address */
     		status = getaddrinfo(remote.host().c_str(), to_string(remote.port()).c_str(), &hints, &result);
 			if (status < 0) {
-				fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
+				if (first) fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
 				return -1;
 			}
 
@@ -358,7 +370,7 @@ class Client {
 					return fd;
 				}
 
-				fprintf(stderr, "connect: %s\n", strerror(errno));
+				if (first) fprintf(stderr, "connect: %s\n", strerror(errno));
 				close(fd);
 				return -2;
 			}
@@ -372,4 +384,22 @@ int main(int argc, char *argv[])
 	Opt_Parse(argc, argv, options, Opt_Number(options), 0);
 	Client client(host, port);
 	client.run();
+
+	int count = 0;
+	fprintf(stderr, "auto reconnecting\n");
+
+	while (true) {
+		fprintf(stderr, "trial %2d\n", count + 1);
+		if (count >= TIMEOUT) {
+			fprintf(stderr, "closing application\n");
+			exit(0);
+		}
+		if (client.reconnect() < 0) {
+			sleep(5);
+			count++;
+			continue;
+		}
+		count = 0;
+		client.run();
+	}
 }
