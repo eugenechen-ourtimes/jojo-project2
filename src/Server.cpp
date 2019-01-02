@@ -155,6 +155,7 @@ class Server {
 		unsigned getMaxFd();
 		void addConnection();
 		void removeUserFromOnlineList(int connFd);
+		void closeConnection(int connFd);
 		void checkConnections(CommandHandler &handler);
 		void saveHistory
 		(
@@ -201,6 +202,27 @@ int main(int argc, char *argv[])
 	server.init();
 	server.run();
 	return 0;
+}
+
+void Server::closeConnection(int connFd)
+{
+	if (states[connFd] == ::ONLINE)
+		removeUserFromOnlineList(connFd);
+	states.erase(connFd);
+
+	map < SocketAddr, int >::iterator c_it;
+	for (c_it = connections.begin(); c_it != connections.end(); c_it++) {
+		if (connFd == c_it->second) {
+			fprintf(stderr, "remove connection to %s:%u\n",
+					c_it->first.host().c_str(),
+					c_it->first.port()
+					);
+			connections.erase(c_it);
+		}
+	}
+
+	close(connFd);
+	FD_CLR(connFd, &readFds);
 }
 
 void Server::removeUserFromOnlineList(int connFd)
@@ -388,8 +410,15 @@ void Server::CommandHandler::checkUsernameTaken(int connFd)
 {
 	char username[64];
 	int usernameLen = -1;
-	recv(connFd, &usernameLen, sizeof(int), 0);
-	recv(connFd, username, usernameLen, 0);
+	if (recv(connFd, &usernameLen, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
+	if (recv(connFd, username, usernameLen, 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
+
 	username[usernameLen] = '\0';
 	map < string, string > &credentials = server.credentials;
 	char usernameTaken = credentials.find(string(username)) != credentials.end() ? 1: 0;
@@ -406,14 +435,26 @@ void Server::CommandHandler::createAccount(int connFd)
 	char username[64];
 	char password[256];
 	int usernameLen = -1;
-	recv(connFd, &usernameLen, sizeof(int), 0);
-	recv(connFd, username, usernameLen, 0);
+	if (recv(connFd, &usernameLen, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
+	if (recv(connFd, username, usernameLen, 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 	username[usernameLen] = '\0';
 	map < string, string > &credentials = server.credentials;
 
 	int passwordLen = -1;
-	recv(connFd, &passwordLen, sizeof(int), 0);
-	recv(connFd, password, passwordLen, 0);
+	if (recv(connFd, &passwordLen, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
+	if (recv(connFd, password, passwordLen, 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 	password[passwordLen] = '\0';
 
 	utils.setUsername(string(username));
@@ -488,16 +529,28 @@ void Server::CommandHandler::handleLogin(int connFd)
 	char username[20];
 	char password[256];
 	int usernameLen = -1;
-	recv(connFd, &usernameLen, sizeof(int), 0);
-	recv(connFd, username, usernameLen, 0);
+	if (recv(connFd, &usernameLen, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
+	if (recv(connFd, username, usernameLen, 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 	username[usernameLen] = '\0';
 
 	map < string, string > &credentials = server.credentials;
 	map < string, int > &onlineUsers = server.onlineUsers;
 
 	int passwordLen = -1;
-	recv(connFd, &passwordLen, sizeof(int), 0);
-	recv(connFd, password, passwordLen, 0);
+	if (recv(connFd, &passwordLen, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
+	if (recv(connFd, password, passwordLen, 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 	password[passwordLen] = '\0';
 
 	map < string, string >::iterator it = credentials.find(string(username));
@@ -535,10 +588,16 @@ void Server::CommandHandler::handleLogout(int connFd)
 {
 	char username[64];
 	int usernameLen = -1;
-	recv(connFd, &usernameLen, sizeof(int), 0);
+	if (recv(connFd, &usernameLen, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 
 	if (usernameLen > 0) {
-		recv(connFd, username, usernameLen, 0);
+		if (recv(connFd, username, usernameLen, 0) == 0) {
+			server.closeConnection(connFd);
+			return;
+		}
 		username[usernameLen] = '\0';
 	} else {
 		strcpy(username, "[anonymous]");
@@ -593,8 +652,14 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 	map < string, int > &onlineUsers = server.onlineUsers;
 	map < string, string > &credentials = server.credentials;
 
-	recv(connFd, &srcLen, sizeof(int), 0);
-	recv(connFd, srcUser, srcLen, 0);
+	if (recv(connFd, &srcLen, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
+	if (recv(connFd, srcUser, srcLen, 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 	srcUser[srcLen] = '\0';
 
 	char a1 = (connFd == onlineUsers[string(srcUser)]) ? 1: 0;
@@ -602,8 +667,14 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 
 	if (!a1) return;
 
-	recv(connFd, &dstLen, sizeof(int), 0);
-	recv(connFd, dstUser, dstLen, 0);
+	if (recv(connFd, &dstLen, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
+	if (recv(connFd, dstUser, dstLen, 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 	dstUser[dstLen] = '\0';
 
 	char a2 = (credentials.find(string(dstUser)) != credentials.end()) ? 1:-0;
@@ -611,8 +682,14 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 
 	if (!a2) return;
 
-	recv(connFd, &msgLen, sizeof(int), 0);
-	recv(connFd, msg, msgLen, 0);
+	if (recv(connFd, &msgLen, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
+	if (recv(connFd, msg, msgLen, 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 
 	msg[msgLen] = '\0';
 
@@ -658,16 +735,28 @@ void Server::CommandHandler::handleSendFile(int connFd)
 	map < string, int > &onlineUsers = server.onlineUsers;
 	map < string, string > &credentials = server.credentials;
 
-	recv(connFd, &srcLen, sizeof(int), 0);
-	recv(connFd, srcUser, srcLen, 0);
+	if (recv(connFd, &srcLen, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
+	if (recv(connFd, srcUser, srcLen, 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 	srcUser[srcLen] = '\0';
 
 	char a1 = (connFd == onlineUsers[string(srcUser)]) ? 1: 0;
 	send(connFd, &a1, 1, 0);
 	if (!a1) return;
 
-	recv(connFd, &dstLen, sizeof(int), 0);
-	recv(connFd, dstUser, dstLen, 0);
+	if (recv(connFd, &dstLen, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
+	if (recv(connFd, dstUser, dstLen, 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 	dstUser[dstLen] = '\0';
 
 	char a2 = (credentials.find(string(dstUser)) != credentials.end()) ? 1: 0;
@@ -676,7 +765,10 @@ void Server::CommandHandler::handleSendFile(int connFd)
 
 	int64_t sz = 0;
 	while (true) {
-		recv(connFd, &sz, 8, 0);
+		if (recv(connFd, &sz, 8, 0) == 0) {
+			server.closeConnection(connFd);
+			return;
+		}
 
 		if (sz == 0) {
 			if (onlineUsers.find(string(dstUser)) != onlineUsers.end())
@@ -694,8 +786,14 @@ void Server::CommandHandler::handleSendFile(int connFd)
 		char permit = true;
 		send(connFd, &permit, 1, 0);
 
-		recv(connFd, &fileNameLen, sizeof(int), 0);
-		recv(connFd, fileName, fileNameLen, 0);
+		if (recv(connFd, &fileNameLen, sizeof(int), 0) == 0) {
+			server.closeConnection(connFd);
+			return;
+		}
+		if (recv(connFd, fileName, fileNameLen, 0) == 0) {
+			server.closeConnection(connFd);
+			return;
+		}
 
 		fileName[fileNameLen] = '\0';
 
@@ -745,9 +843,18 @@ void Server::CommandHandler::handleSendFile(int connFd)
 		while (sz > 0) {
 			int32_t size = (sz < IOBufSize) ? sz: IOBufSize;
 			int ret = recv(connFd, buf, size, 0);
-			if (ret == 0) {
-				fprintf(stderr, "error\n");
+			if (ret < 0) {
+				perror("recv");
+				return;
 			}
+
+			if (ret == 0) {
+				fprintf(stderr, "error: connection close when receiving file\n");
+				fclose(fp);
+				server.closeConnection(connFd);
+				return;
+			}
+
 			fwrite(buf, 1, ret, fp);
 			sz -= ret;
 		}
@@ -813,8 +920,14 @@ void Server::CommandHandler::handleHistoryRequest(int connFd)
 	map < string, int > &onlineUsers = server.onlineUsers;
 	char user[64];
 	int userLen = -1;
-	recv(connFd, &userLen, sizeof(int), 0);
-	recv(connFd, user, userLen, 0);
+	if (recv(connFd, &userLen, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
+	if (recv(connFd, user, userLen, 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 	user[userLen] = '\0';
 
 	char a1 = (connFd == onlineUsers[string(user)]) ? 1: 0;
@@ -822,7 +935,10 @@ void Server::CommandHandler::handleHistoryRequest(int connFd)
 	if (!a1) return;
 
 	int bufSize = -1;
-	recv(connFd, &bufSize, sizeof(int), 0);
+	if (recv(connFd, &bufSize, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 	fprintf(stderr, "bufSize = %d\n", bufSize);
 	char permit = (bufSize > 0) ? 1: 0;
 	send(connFd, &permit, 1, 0);
@@ -924,7 +1040,10 @@ void Server::sendOfflineData(string username)
 		send(connFd, f4.c_str(), f4Len, 0);
 
 		char received = false;
-		recv(connFd, &received, 1, 0);
+		if (recv(connFd, &received, 1, 0) == 0) {
+			closeConnection(connFd);
+			return;
+		}
 		if (!received) allReceived = false;
 	}
 
@@ -939,22 +1058,40 @@ void Server::CommandHandler::handleDownloadRequest(int connFd)
 	int time_len;
 	int usernameLen, filenameLen;
 
-	recv(connFd, &usernameLen, sizeof(int), 0);
-	recv(connFd, username, usernameLen, 0);
+	if (recv(connFd, &usernameLen, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
+	if (recv(connFd, username, usernameLen, 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 	username[usernameLen] = '\0';
 
 	char a1 = (connFd == onlineUsers[string(username)]) ? 1: 0;
 	send(connFd, &a1, 1, 0);
 	if (!a1) return;
 
-	recv(connFd, &filenameLen, sizeof(int), 0);
-	recv(connFd, filename, filenameLen, 0);
+	if (recv(connFd, &filenameLen, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
+	if (recv(connFd, filename, filenameLen, 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 	filename[filenameLen] = '\0';
 
-	recv(connFd, &time_len, sizeof(int), 0);
+	if (recv(connFd, &time_len, sizeof(int), 0) == 0) {
+		server.closeConnection(connFd);
+		return;
+	}
 
 	if (time_len > 0)
-		recv(connFd, time_cstr, time_len, 0);
+		if (recv(connFd, time_cstr, time_len, 0) == 0) {
+			server.closeConnection(connFd);
+			return;
+		}
 
 	time_cstr[time_len] = '\0';
 
@@ -1002,7 +1139,7 @@ void Server::CommandHandler::handleDownloadRequest(int connFd)
 			exit(-1);
 		}
 		send(connFd, &permit, sizeof(int), 0);
-		return ;
+		return;
 	}
 
 	permit = 1;
@@ -1013,7 +1150,7 @@ void Server::CommandHandler::handleDownloadRequest(int connFd)
 	fprintf(stderr, "file size: %" PRId64 "\n", sz);
 
 	if (fseek(fp, 0L, SEEK_SET) < 0) {
-		fprintf(stderr, "error\n");
+		fprintf(stderr, "fseek error\n");
 		exit(-1);
 	}
 
