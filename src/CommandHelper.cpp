@@ -577,7 +577,7 @@ void CommandHelper::list()
 
 void CommandHelper::history(const char *arg)
 {
-	#define DEFAULT 20
+	#define DEFAULT 32767
 	int bufSize = DEFAULT;
 	if (arg != NULL) {
 		bufSize = atoi(arg);
@@ -668,7 +668,7 @@ void CommandHelper::showDownloadList(const char *arg)
 	char name[64];
 	char time_cstr[32];
 	queue < pair < string, string > > q;
-	#define DEFAULT 10
+	#define DEFAULT 32767
 	int bufSize = DEFAULT;
 	#undef DEFAULT
 	if (arg != NULL) {
