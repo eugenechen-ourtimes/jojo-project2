@@ -26,23 +26,6 @@ const string CommandHelper::savedPasswordFolder = "../data/client/pass/";
 const string CommandHelper::downloadFolder = "../data/client/download/";
 const string CommandHelper::downloadListFolder = "../data/client/downloadList/";
 
-const string CommandHelper::HELP = "\\help";
-const string CommandHelper::REFRESH = "\\refresh";
-const string CommandHelper::SIGN_UP = "\\sign-up";
-const string CommandHelper::LOGIN = "\\login";
-const string CommandHelper::QUIT = "\\quit";
-const string CommandHelper::USERNAME = "\\username";
-const string CommandHelper::PASSWORD = "\\password";
-const string CommandHelper::CONFIRM_PASSWORD = "\\confirm-password";
-const string CommandHelper::CANCEL = "\\cancel";
-const string CommandHelper::CREATE_ACCOUNT = "\\create-account";
-const string CommandHelper::LIST = "\\list";
-const string CommandHelper::SEND = "\\send";
-const string CommandHelper::LOGOUT = "\\logout";
-const string CommandHelper::HISTORY = "\\history";
-const string CommandHelper::DOWNLOAD = "\\download";
-const string CommandHelper::DOWNLOADLIST = "\\download-list";
-
 const char *CommandHelper::version = "1.0";
 
 CommandHelper::CommandHelper(int connFd, State state)
@@ -56,98 +39,65 @@ CommandHelper::CommandHelper(int connFd, State state)
 
 void CommandHelper::help()
 {
-	fprintf(stderr, "input " BYEL "%s" RESET " to refresh your web page\n",
-		REFRESH.c_str()
-		);
+	fprintf(stderr, "input " BYEL REFRESH RESET " to refresh your web page\n");
 	showLocalCommands();
 }
 
 void CommandHelper::showLocalCommands()
 {
 	if (state == ::HOME) {
-		fprintf(stderr, "\ninput " BYEL "%s" RESET " to enter the signup page\n",
-			SIGN_UP.c_str()
-			);
+		fprintf(stderr, "\ninput " BYEL SIGN_UP RESET " to enter the signup page\n");
 
-		fprintf(stderr, "\ninput " BYEL "%s"   RESET " to log in\n",
-			LOGIN.c_str()
-			);
+		fprintf(stderr, "\ninput " BYEL LOGIN   RESET " to log in\n");
 
-		fprintf(stderr, "\ninput " BYEL "%s"    RESET " to leave the application\n",
-			QUIT.c_str()
-			);
+		fprintf(stderr, "\ninput " BYEL QUIT    RESET " to leave the application\n");
 		return;
 	}
 
 	if (state == ::REGISTER) {
-		fprintf(stderr, "\ninput " BYEL "%s [username]" RESET
-			" to register account with [username]\n",
-			USERNAME.c_str()
-			);
+		fprintf(stderr, "\ninput " BYEL USERNAME " [username]" RESET
+			" to register account with [username]\n");
 
-		fprintf(stderr, "\ninput " BYEL "%s"            RESET
-			" to set the password; to execute this instruction, the username must be set.\n",
-			PASSWORD.c_str()
-			);
+		fprintf(stderr, "\ninput " BYEL PASSWORD           RESET
+			" to set the password; to execute this instruction, the username must be set.\n");
 
-		fprintf(stderr, "\ninput " BYEL "%s"    RESET
-			" to confirm your password; Password should be set before.\n",
-			CONFIRM_PASSWORD.c_str()
-			);
+		fprintf(stderr, "\ninput " BYEL CONFIRM_PASSWORD    RESET
+			" to confirm your password; Password should be set before.\n");
 
-		fprintf(stderr, "\ninput " BYEL "%s"              RESET
-			" to cancel sign up and return to previous page\n",
-			CANCEL.c_str()
-			);
+		fprintf(stderr, "\ninput " BYEL CANCEL              RESET
+			" to cancel sign up and return to previous page\n");
 
-		fprintf(stderr, "\ninput " BYEL "%s"      RESET
-			": you can create the account successfully if username, password, and confirm-password have been correctly set\n",
-			CREATE_ACCOUNT.c_str()
-			);
+		fprintf(stderr, "\ninput " BYEL CREATE_ACCOUNT     RESET
+			": you can create the account successfully if username, password, and confirm-password have been correctly set\n");
 		return;
 	}
 
 	if (state == ::ONLINE) {
-		fprintf(stderr,"\ninput " BYEL "%s" " [-m] [ID] \'message\'"   RESET
-			" to send a message to a specific ID; message transmitting is the default action of " BYEL "%s" RESET
-			", so [-m] is optional.\n",
-			SEND.c_str(),
-			SEND.c_str()
-			);
+		fprintf(stderr,"\ninput " BYEL SEND " [-m] [ID] \'message\'"   RESET
+			" to send a message to a specific ID; message transmitting is the default action of " BYEL SEND RESET
+			", so [-m] is optional.\n");
 
 		#define COLOR "\033[36m\033[1m"
-		fprintf(stderr,"\ninput " BYEL "%s" " [-f] [ID] \'filenames\'"  RESET
+		fprintf(stderr,"\ninput " BYEL SEND " [-f] [ID] \'filenames\'"  RESET
 			" to send files to a specific ID, where " BYEL "filenames" RESET
 			" are separated by \'" COLOR "," RESET "\';"
-			" make sure you have specify \'-f\' for file sending.\n",
-			SEND.c_str()
-			);
+			" make sure you have specify \'" COLOR "-f" RESET "\' for file sending.\n");
 		#undef COLOR
 
-		fprintf(stderr,"\ninput " BYEL "%s"    RESET
-			" to get a list of person who has signed up for Chatroom\n",
-			LIST.c_str()
-			);
+		fprintf(stderr,"\ninput " BYEL LIST    RESET
+			" to get a list of person who has signed up for Chatroom\n");
 
-		fprintf(stderr,"\ninput " BYEL "%s" RESET
-			" to view previous message\n",
-			HISTORY.c_str()
-			);
+		fprintf(stderr,"\ninput " BYEL HISTORY RESET
+			" to view previous message\n");
 
-		fprintf(stderr,"\ninput " BYEL "%s"       RESET
-			" to view the files available for downloading\n",
-			DOWNLOADLIST.c_str()
-			);
+		fprintf(stderr,"\ninput " BYEL DOWNLOADLIST     RESET
+			" to view the files available for downloading\n");
 
-		fprintf(stderr,"\ninput " BYEL "%s"" [filename]" RESET
-			" to download the corresponding file\n",
-			DOWNLOAD.c_str()
-			);
+		fprintf(stderr,"\ninput " BYEL DOWNLOAD " [filename]" RESET
+			" to download the corresponding file\n");
 
-		fprintf(stderr,"\ninput " BYEL "%s"  RESET
-			" to log out and go back to initial login menu\n",
-			LOGOUT.c_str()
-			);
+		fprintf(stderr,"\ninput " BYEL LOGOUT  RESET
+			" to log out and go back to initial login menu\n");
 	}
 }
 
@@ -184,16 +134,13 @@ void CommandHelper::signUp()
 
 void CommandHelper::login()
 {
-	const char *str_ret = "\\return";
-	fprintf(stderr,"Please input your username or input " BYEL "%s" RESET " to exit\n",
-		str_ret
-		);
+	fprintf(stderr,"Please input your username or input " BYEL RETURN RESET " to exit\n");
 	fprintf(stderr,"Input your username: ");
 	char line[64];
 	char username[32];
 	fgets(line, 64, stdin);
 	sscanf(line, "%s", username);
-	if(!strcmp(username, str_ret)){
+	if(!strcmp(username, RETURN)){
 		refresh();
 		return;
 	}
@@ -215,11 +162,9 @@ void CommandHelper::login()
 			perror(savedPasswordPath.c_str());
 			exit(-1);
 		}
-		fprintf(stderr,"Please key in your password or input " BYEL "%s" RESET " to exit\n",
-			str_ret
-			);
+		fprintf(stderr,"Please key in your password or input " BYEL RETURN RESET " to exit\n");
 		password = getpass("Input your password: ");
-		if (!strcmp(password, str_ret)) {
+		if (!strcmp(password, RETURN)) {
 			refresh();
 			return;
 		}
@@ -718,9 +663,7 @@ void CommandHelper::showDownloadList(const char *arg)
 		return;
 	}
 
-	fprintf(stderr,"\ninput " BYEL "%s [%s]" RESET " to require downloading a file.\n",
-		DOWNLOAD.c_str(),
-		"%s");
+	fprintf(stderr,"\ninput " BYEL DOWNLOAD " [%%s]" RESET " to require downloading a file.\n");
 
 	char name[64];
 	char time_cstr[32];
@@ -869,18 +812,15 @@ void CommandHelper::promptReturningToHomePage()
 
 void CommandHelper::showHomePage()
 {
+	#define SPACE "    "
 	fprintf(stderr,"\t"      "*===========================*\n");
 	fprintf(stderr,"\t"      "*=                         =*\n");
 	fprintf(stderr,"\t"      "*= \033[5mWelcome to Chatroom %s \033[0m=*\n", version);
 	fprintf(stderr,"\t"      "*=                         =*\n");
 	fprintf(stderr,"\t"      "*===========================*\n\n");
 	fprintf(stderr,"\t"      "Start with an instruction\n");
-	fprintf(stderr,"\t" BYEL "%s    %s    %s    %s" RESET "\n",
-		SIGN_UP.c_str(),
-		LOGIN.c_str(),
-		QUIT.c_str(),
-		HELP.c_str()
-		);
+	fprintf(stderr,"\t" BYEL SIGN_UP SPACE LOGIN SPACE QUIT SPACE HELP RESET "\n");
+	#undef SPACE
 }
 
 void CommandHelper::showOnlinePage()
@@ -890,15 +830,6 @@ void CommandHelper::showOnlinePage()
 		username.empty() ? "[anonymous]": username.c_str()
 		);
 	#undef COLOR
-	fprintf(stderr,      "\t" BYEL "%s       %s       %s [%s]\t%s [%s]" RESET "\n",
-		SEND.c_str(),
-		LIST.c_str(),
-		HISTORY.c_str(), "%d",
-		DOWNLOADLIST.c_str(), "%d"
-		);
-	fprintf(stderr,      "\t" BYEL "%s [%s] [%s] %s         %s" RESET "\n",
-		DOWNLOAD.c_str(), "file", "time",
-		LOGOUT.c_str(),
-		HELP.c_str()
-		);
+	fprintf(stderr,      "\t" BYEL SEND "       " LIST "       " HISTORY " [%%d]\t" DOWNLOADLIST " [%%d]" RESET "\n");
+	fprintf(stderr,      "\t" BYEL DOWNLOAD " [file] [time] " LOGOUT "         " HELP RESET "\n");
 }

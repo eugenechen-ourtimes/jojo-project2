@@ -90,18 +90,18 @@ class Client {
 
 			if (strCommand.empty()) return;
 
-			if (strCommand == CommandHelper::HELP) {
+			if (strCommand == HELP) {
 				helper.help();
 				return;
 			}
 
-			if (strCommand == CommandHelper::REFRESH) {
+			if (strCommand == REFRESH) {
 				helper.refresh();
 				return;
 			}
 
 			/* home page */
-			if (strCommand == CommandHelper::SIGN_UP) {
+			if (strCommand == SIGN_UP) {
 				if (helper.getState() != ::HOME) {
 					helper.promptStateIncorrect();
 					return;
@@ -110,7 +110,7 @@ class Client {
 				return;
 			}
 
-			if (strCommand == CommandHelper::LOGIN) {
+			if (strCommand == LOGIN) {
 				if (helper.getState() != ::HOME) {
 					helper.promptStateIncorrect();
 					return;
@@ -119,7 +119,7 @@ class Client {
 				return;
 			}
 
-			if (strCommand == CommandHelper::QUIT) {
+			if (strCommand == QUIT) {
 				if (helper.getState() != ::HOME) {
 					helper.promptStateIncorrect();
 					return;
@@ -129,7 +129,7 @@ class Client {
 			}
 
 			/* sign-up page */
-			if (strCommand == CommandHelper::USERNAME) {
+			if (strCommand == USERNAME) {
 				if (helper.getState() != ::REGISTER) {
 					helper.promptStateIncorrect();
 					return;
@@ -144,7 +144,7 @@ class Client {
 				return;
 			}
 
-			if (strCommand == CommandHelper::PASSWORD) {
+			if (strCommand == PASSWORD) {
 				if (helper.getState() != ::REGISTER) {
 					helper.promptStateIncorrect();
 					return;
@@ -154,7 +154,7 @@ class Client {
 				return;
 			}
 
-			if (strCommand == CommandHelper::CONFIRM_PASSWORD) {
+			if (strCommand == CONFIRM_PASSWORD) {
 				if (helper.getState() != ::REGISTER) {
 					helper.promptStateIncorrect();
 					return;
@@ -163,7 +163,7 @@ class Client {
 				return;
 			}
 
-			if (strCommand == CommandHelper::CANCEL) {
+			if (strCommand == CANCEL) {
 				if (helper.getState() != ::REGISTER) {
 					helper.promptStateIncorrect();
 					return;
@@ -172,7 +172,7 @@ class Client {
 				return;
 			}
 
-			if (strCommand == CommandHelper::CREATE_ACCOUNT) {
+			if (strCommand == CREATE_ACCOUNT) {
 				if (helper.getState() != ::REGISTER) {
 					helper.promptStateIncorrect();
 					return;
@@ -181,15 +181,13 @@ class Client {
 				return;
 			}
 
-			if (strCommand == CommandHelper::SEND) {
+			if (strCommand == SEND) {
 				if (helper.getState() != ::ONLINE) {
 					helper.promptStateIncorrect();
 					return;
 				}
 				if (ret < 3) {
-					fprintf(stderr, "format error! input " BYEL "%s" RESET " to make sure the format\n",
-						CommandHelper::HELP.c_str()
-						);
+					fprintf(stderr, "format error! input " BYEL HELP RESET " to make sure the format\n");
 					return;
 				}
 
@@ -202,7 +200,7 @@ class Client {
 				return;
 			}
 
-			if (strCommand == CommandHelper::LIST) {
+			if (strCommand == LIST) {
 				if (helper.getState() != ::ONLINE) {
 					helper.promptStateIncorrect();
 					return;
@@ -211,7 +209,7 @@ class Client {
 				return;
 			}
 
-			if (strCommand == CommandHelper::HISTORY) {
+			if (strCommand == HISTORY) {
 				if (helper.getState() != :: ONLINE) {
 					helper.promptStateIncorrect();
 					return;
@@ -220,7 +218,7 @@ class Client {
 				return;
 			}
 
-			if (strCommand == CommandHelper::DOWNLOADLIST) {
+			if (strCommand == DOWNLOADLIST) {
 				if (helper.getState() != :: ONLINE) {
 					helper.promptStateIncorrect();
 					return;
@@ -229,19 +227,15 @@ class Client {
 				return;
 			}
 
-			if (strCommand == CommandHelper::DOWNLOAD) {
+			if (strCommand == DOWNLOAD) {
 				if (helper.getState() != ::ONLINE) {
 					helper.promptStateIncorrect();
 					return;
 				}
 
 				if (ret < 2) {
-					fprintf(stderr, "format error! " BYEL "%s" RESET " should be followed by at least one parameter [%s],"
-						" or you can input " BYEL "%s" RESET " to see advanced instruction\n",
-						CommandHelper::DOWNLOAD.c_str(),
-						"%s",
-						CommandHelper::HELP.c_str()
-						);
+					fprintf(stderr, "format error! " BYEL DOWNLOAD RESET " should be followed by at least one parameter [%%s],"
+						" or you can input " BYEL HELP RESET " to see advanced instruction\n");
 					return;
 				}
 
@@ -249,7 +243,7 @@ class Client {
 				return;
 			}
 
-			if (strCommand == CommandHelper::LOGOUT) {
+			if (strCommand == LOGOUT) {
 				helper.logout();
 				return;
 			}
@@ -332,9 +326,7 @@ class Client {
 			}
 
 			if (hasFile) {
-				fprintf(stderr, "input " BYEL "%s" " [filename]" RESET " to download files\n",
-					CommandHelper::DOWNLOAD.c_str()
-					);
+				fprintf(stderr, "input " BYEL DOWNLOAD " [filename]" RESET " to download files\n");
 			}
 		}
 

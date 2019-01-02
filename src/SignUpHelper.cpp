@@ -173,9 +173,7 @@ void SignUpHelper::refresh()
 	}
 
 	if (passwordValid() && confirmPassword.empty()) {
-		fprintf(stderr,"Please input " BYEL "%s" RESET " before creating account.\n", 
-			CommandHelper::CONFIRM_PASSWORD.c_str()
-			);
+		fprintf(stderr,"Please input " BYEL CONFIRM_PASSWORD RESET " before creating account.\n");
 		return;
 	}
 
@@ -186,13 +184,5 @@ void SignUpHelper::refresh()
 	}
 
 	fprintf(stderr,"\n" "    " BOLD "One account. Meet all your friends at Chatroom" RESET "\n");
-	fprintf(stderr,     "    " BYEL "%s [%s]   %s   %s   %s   %s   %s" RESET "\n",
-		CommandHelper::USERNAME.c_str(),
-		"%s",
-		CommandHelper::PASSWORD.c_str(),
-		CommandHelper::CONFIRM_PASSWORD.c_str(),
-		CommandHelper::CANCEL.c_str(),
-		CommandHelper::CREATE_ACCOUNT.c_str(),
-		CommandHelper::HELP.c_str()
-		);
+	fprintf(stderr,     "    " BYEL USERNAME " [%%s]   " PASSWORD "   " CONFIRM_PASSWORD  "   " CANCEL "   " CREATE_ACCOUNT "   " HELP RESET "\n");
 }
