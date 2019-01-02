@@ -677,12 +677,18 @@ void Server::CommandHandler::handleSendFile(int connFd)
 	int64_t sz = 0;
 	while (true) {
 		recv(connFd, &sz, 8, 0);
-		if (sz == 0) return;
+
+		if (sz == 0) {
+			if (onlineUsers.find(string(dstUser)) != onlineUsers.end())
+				server.sendOfflineData(string(dstUser));
+			return;
+		}
+
 		if (sz > MaxFile) {
 			char permit = false;
 			fprintf(stderr, "file size too large!\n");
 			send(connFd, &permit, 1, 0);
-			return;
+			continue;
 		}
 
 		char permit = true;
@@ -755,9 +761,6 @@ void Server::CommandHandler::handleSendFile(int connFd)
 			_sz
 			);
 	}
-
-	if (onlineUsers.find(string(dstUser)) != onlineUsers.end())
-		server.sendOfflineData(string(dstUser));
 }
 
 void Server::saveHistory
