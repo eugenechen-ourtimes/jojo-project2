@@ -652,6 +652,7 @@ void Server::CommandHandler::handleSendMessage(int connFd)
 
 void Server::CommandHandler::handleSendFile(int connFd)
 {
+	static char buf[IOBufSize];
 	char srcUser[64], dstUser[64], fileName[256];
 	int srcLen, dstLen, fileNameLen;
 	map < string, int > &onlineUsers = server.onlineUsers;
@@ -673,85 +674,87 @@ void Server::CommandHandler::handleSendFile(int connFd)
 	send(connFd, &a2, 1, 0);
 	if (!a2) return;
 
-	recv(connFd, &fileNameLen, sizeof(int), 0);
-	recv(connFd, fileName, fileNameLen, 0);
-	fileName[fileNameLen] = '\0';
-
-	map < string, int >::iterator it = onlineUsers.find(string(dstUser));
-
-	char *time_cstr = TimeUtils::get_time_cstr(time(NULL));
-	if (time_cstr == NULL) {
-		TimeUtils::showError();
-		return;
-	}
-
-	int time_len = strlen(time_cstr);
-	DataType type = File;
-
-	string offlineDataPath = offlineFolder + string(dstUser);
-	FILE *async = fopen(offlineDataPath.c_str(), "a");
-	if (async == NULL) {
-		perror(offlineDataPath.c_str());
-		return;
-	}
-
-	fprintf(async, "%s %s %d\t%s\n", srcUser, fileName, (int)type, time_cstr);
-	fclose(async);
-
-	server.saveHistory
-	(
-		string(srcUser),
-		string(dstUser),
-		string(fileName),
-		type,
-		string(time_cstr)
-	);
-
-	string dstUserDownloadFolder = fileUploadFolder + string(dstUser) + "/";
-
-	mkdirIfNotExist(dstUserDownloadFolder.c_str());
-
-
-	string baseName = string(TimeUtils::encode_time_str(time_cstr)) + del + string(fileName);
-	string path = dstUserDownloadFolder + baseName;
-
-	FILE *fp = fopen(path.c_str(), "w");
-
-	if (fp == NULL) {
-		perror(path.c_str());
-		exit(-1);
-	}
-
 	int64_t sz = 0;
-	recv(connFd, &sz, 8, 0);
-
-	if (sz > MaxFile) {
-		char permit = false;
-		fprintf(stderr, "%s: file size too large!\n", fileName);
-		send(connFd, &permit, 1, 0);
-		return;
-	}
-
-	char permit = true;
-	send(connFd, &permit, 1, 0);
-
-	char buf[IOBufSize];
-	while (sz > 0) {
-		int32_t size = (sz < IOBufSize) ? sz: IOBufSize;
-		int ret = recv(connFd, buf, size, 0);
-		if (ret == 0) {
-			fprintf(stderr, "error\n");
+	while (true) {
+		recv(connFd, &sz, 8, 0);
+		if (sz == 0) return;
+		if (sz > MaxFile) {
+			char permit = false;
+			fprintf(stderr, "file size too large!\n");
+			send(connFd, &permit, 1, 0);
+			return;
 		}
-		fwrite(buf, 1, ret, fp);
-		sz -= ret;
-	}
 
-	fclose(fp);
-	fprintf(stderr, "receive file %s uploaded by %s, send it to %s\n",
-		fileName,
-		srcUser,
-		dstUser
+		char permit = true;
+		send(connFd, &permit, 1, 0);
+
+		recv(connFd, &fileNameLen, sizeof(int), 0);
+		recv(connFd, fileName, fileNameLen, 0);
+
+		fileName[fileNameLen] = '\0';
+
+		char *time_cstr = TimeUtils::get_time_cstr(time(NULL));
+		if (time_cstr == NULL) {
+			TimeUtils::showError();
+			return;
+		}
+
+		int time_len = strlen(time_cstr);
+		DataType type = File;
+
+		string offlineDataPath = offlineFolder + string(dstUser);
+		FILE *async = fopen(offlineDataPath.c_str(), "a");
+		if (async == NULL) {
+			perror(offlineDataPath.c_str());
+			return;
+		}
+
+		fprintf(async, "%s %s %d\t%s\n", srcUser, fileName, (int)type, time_cstr);
+		fclose(async);
+
+		server.saveHistory
+		(
+			string(srcUser),
+			string(dstUser),
+			string(fileName),
+			type,
+			string(time_cstr)
 		);
+
+		string dstUserDownloadFolder = fileUploadFolder + string(dstUser) + "/";
+
+		mkdirIfNotExist(dstUserDownloadFolder.c_str());
+
+		string baseName = string(TimeUtils::encode_time_str(time_cstr)) + del + string(fileName);
+		string path = dstUserDownloadFolder + baseName;
+
+		FILE *fp = fopen(path.c_str(), "w");
+
+		if (fp == NULL) {
+			perror(path.c_str());
+			return;
+		}
+
+		int64_t _sz = sz;
+		while (sz > 0) {
+			int32_t size = (sz < IOBufSize) ? sz: IOBufSize;
+			int ret = recv(connFd, buf, size, 0);
+			if (ret == 0) {
+				fprintf(stderr, "error\n");
+			}
+			fwrite(buf, 1, ret, fp);
+			sz -= ret;
+		}
+
+		fclose(fp);
+
+		fprintf(stderr, "receive file %s uploaded by %s, send it to %s (size %" PRId64 " bytes)\n",
+			fileName,
+			srcUser,
+			dstUser,
+			_sz
+			);
+	}
 
 	if (onlineUsers.find(string(dstUser)) != onlineUsers.end())
 		server.sendOfflineData(string(dstUser));

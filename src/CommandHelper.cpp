@@ -113,10 +113,14 @@ void CommandHelper::showLocalCommands()
 			SEND.c_str()
 			);
 
-		fprintf(stderr,"\ninput " BYEL "%s" " [-f] [ID] \'filename\'"  RESET
-			" to send a file to a specific ID; make sure you have specify \'-f\' for file sending.\n",
+		#define COLOR "\033[36m\033[1m"
+		fprintf(stderr,"\ninput " BYEL "%s" " [-f] [ID] \'filenames\'"  RESET
+			" to send files to a specific ID, where " BYEL "filenames" RESET
+			" are separated by \'" COLOR "," RESET "\';"
+			" make sure you have specify \'-f\' for file sending.\n",
 			SEND.c_str()
 			);
+		#undef COLOR
 
 		fprintf(stderr,"\ninput " BYEL "%s"    RESET
 			" to get a list of person who has signed up for Chatroom\n",
@@ -452,63 +456,23 @@ void CommandHelper::sendMessage(string target, string message)
 
 void CommandHelper::sendFile(string target, string arg)
 {
-	int pathLen = arg.length();
-	char *path = (char *)malloc(pathLen + 1);
-	strcpy(path, arg.c_str());
-
-	struct stat buffer;
-	if (stat(path, &buffer) < 0) {
-		perror("stat");
-		free(path);
-		return;
+	static char buf[IOBufSize];
+	int argLen = arg.length();
+	char *filenames = (char *)malloc(argLen + 1);
+	strcpy(filenames, arg.c_str());
+	if (filenames == NULL) {
+		fprintf(stderr, "malloc returns NULL\n");
+		exit(-1);
 	}
 
-	if (!S_ISREG(buffer.st_mode)) {
-		string t_str;
-				if (S_ISDIR(buffer.st_mode))	t_str = "directory";
-		else	if (S_ISCHR(buffer.st_mode))	t_str = "character special";
-		else	if (S_ISBLK(buffer.st_mode))	t_str = "block special";
-		else	if (S_ISFIFO(buffer.st_mode))	t_str = "fifo";
-		else	if (S_ISLNK(buffer.st_mode))	t_str = "symbolic link";
-		else									t_str = "unknown mode!";
-		fprintf(stderr, "file type: " RED "%s" RESET ", this is not allowed to upload\n", t_str.c_str());
-		free(path);
-		return;
+	vector < string > fileNames;
+	char *path = strtok(filenames, ",");
+	while (path != NULL) {
+		fileNames.push_back(string(path));
+		path = strtok(NULL, ",");
 	}
 
-	FILE *fp = fopen(path, "rb");
-	if (fp == NULL) {
-		perror(path);
-		free(path);
-		return;
-	}
-
-	fseek(fp, 0L, SEEK_END);
-	int64_t sz = ftell(fp);
-
-	if (sz > MaxFile) {
-		fprintf(stderr, "%s: file size too large ... no more than %d MB.\n", path, Limit);
-		fclose(fp);
-		free(path);
-		return;
-	}
-
-	rewind(fp);
-
-	char *ts1 = strdup(path);
-	char *ts2 = strdup(path);
-
-	if (ts1 == NULL || ts2 == NULL) {
-		fprintf(stderr, "strdup error\n");
-		if (ts1 != NULL) free(ts1);
-		if (ts2 != NULL) free(ts2);
-		free(path);
-		return;
-	}
-
-	char *dir = dirname(ts1);
-	char *filename = basename(ts2);
-	int filenameLen = strlen(filename);
+	free(filenames);
 
 	Command command = ::sendFile;
 	send(connFd, &command, sizeof(int), 0);
@@ -523,7 +487,6 @@ void CommandHelper::sendFile(string target, string arg)
 	recv(connFd, &a1, 1, 0);
 	if (!a1) {
 		fprintf(stderr, "username incorrect\n");
-		fclose(fp); free(path); free(ts1); free(ts2);
 		return;
 	}
 
@@ -534,36 +497,100 @@ void CommandHelper::sendFile(string target, string arg)
 	recv(connFd, &a2, 1, 0);
 	if (!a2) {
 		fprintf(stderr, "dst username does not exist\n");
-		fclose(fp); free(path); free(ts1); free(ts2);
 		return;
 	}
 
-	send(connFd, &filenameLen, sizeof(int), 0);
-	send(connFd, filename, filenameLen, 0);
+	for (int i = 0; i < fileNames.size(); i++) {
+		struct stat buffer;
+		if (lstat(fileNames[i].c_str(), &buffer) < 0) {
+			char err_msg[100];
+			sprintf(err_msg, "lstat: %s", fileNames[i].c_str());
+			perror(err_msg);
+			if (errno == ENOENT) continue;
 
-	char buf[IOBufSize];
-	int32_t size;
+			int64_t end = 0;
+			send(connFd, &end, 8, 0);
+			exit(-1);
+		}
 
-	send(connFd, &sz, 8, 0);
-	char permit = false;
-	recv(connFd, &permit, 1, 0);
+		if (!S_ISREG(buffer.st_mode)) {
+			string t_str;
+					if (S_ISDIR(buffer.st_mode))	t_str = "directory";
+			else	if (S_ISCHR(buffer.st_mode))	t_str = "character special";
+			else	if (S_ISBLK(buffer.st_mode))	t_str = "block special";
+			else	if (S_ISFIFO(buffer.st_mode))	t_str = "fifo";
+			else	if (S_ISLNK(buffer.st_mode))	t_str = "symbolic link";
+			else									t_str = "unknown mode!";
+			fprintf(stderr, "%s: file type is " RED "%s" RESET ", this is not allowed to upload\n",
+				fileNames[i].c_str(),
+				t_str.c_str()
+				);
+			continue;
+		}
 
-	if (permit) {
+		int64_t sz = buffer.st_size;
+		if (sz > MaxFile) {
+			fprintf(stderr, "%s: file size too large ... no more than %d MB.\n",
+				fileNames[i].c_str(),
+				Limit
+				);
+			continue;
+		}
+
+		FILE *fp = fopen(fileNames[i].c_str(), "rb");
+		if (fp == NULL) {
+			perror(fileNames[i].c_str());
+			if (errno == ENOENT) continue;
+
+			int64_t end = 0;
+			send(connFd, &end, 8, 0);
+			exit(-1);
+		}
+
+		send(connFd, &sz, 8, 0);
+		char permit = false;
+		recv(connFd, &permit, 1, 0);
+
+		if (!permit) {
+			fprintf(stderr, "server says file size too large!\n");
+			fclose(fp);
+			continue;
+		}
+
+		char *path = (char *)malloc(fileNames[i].length() + 1);
+		if (path == NULL) {
+			fprintf(stderr, "malloc returns NULL\n");
+			exit(-1);
+		}
+
+		strcpy(path, fileNames[i].c_str());
+
+		char *ts = strdup(path);
+		if (ts == NULL) {
+			fprintf(stderr, "strdup error\n");
+			exit(-1);
+		}
+
+		char *filename = basename(ts);
+		int filenameLen = strlen(filename);
+
+		send(connFd, &filenameLen, sizeof(int), 0);
+		send(connFd, filename, filenameLen, 0);
+
 		while (sz > 0) {
-			size = (sz < IOBufSize) ? sz: IOBufSize;
+			int32_t size = (sz < IOBufSize) ? sz: IOBufSize;
 			fread(buf, 1, size, fp);
 			send(connFd, buf, size, 0);
 			sz -= size;
 		}
+
+		fprintf(stderr, "%s uploaded\n", filename);
+		fclose(fp); free(path); free(ts);
 	}
 
-	else {
-		fprintf(stderr, "server says file size too large!\n");
-	}
-
-	fprintf(stderr, "file uploaded\n");
-
-	fclose(fp); free(path); free(ts1); free(ts2);
+	int64_t end = 0;
+	send(connFd, &end, 8, 0);
+	return;
 }
 
 void CommandHelper::list()
