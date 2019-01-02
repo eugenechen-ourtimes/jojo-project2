@@ -143,48 +143,51 @@ void SignUpHelper::refresh()
 		confirmPassword.empty() ? strEmpty.c_str(): strHidden.c_str());
 
 	if (usernameTooLong()) {
-		fprintf(stderr, YEL "=> Username Too Long\n" RESET);
+		fprintf(stderr, YEL "=> Username Too Long" RESET "\n");
 		return;
 	}
 
 	if (usernameTaken) {
-		fprintf(stderr, YEL "=> Username Already Taken\n" RESET);
+		fprintf(stderr, YEL "=> Username Already Taken" RESET "\n");
 		return;
 	}
 
 	if (!usernameAlphaNumeric()) {
-		fprintf(stderr, YEL "=> Username May Only Contain Letters(a-z) and Numbers(0-9)\n" RESET);
+		fprintf(stderr, YEL "=> Username May Only Contain Letters(a-z) and Numbers(0-9)" RESET "\n");
 		return;
 	}
 
 	if (!password.empty() && passwordTooShort()) {
-		fprintf(stderr, YEL "=> Password Too Short\n" RESET);
+		fprintf(stderr, YEL "=> Password Too Short" RESET "\n");
 		return;
 	}
 
 	if (!password.empty() && !passwordAlphaNumeric()) {
-		fprintf(stderr, YEL "=> Password May Only Contain Letters(a-z) and Numbers(0-9)\n" RESET);
+		fprintf(stderr, YEL "=> Password May Only Contain Letters(a-z) and Numbers(0-9)" RESET "\n");
 		return;
 	}
 
 	if (!confirmPassword.empty() && !passwordMatched()) {
-		fprintf(stderr, YEL "=> Password Mismatched\n" RESET);
+		fprintf(stderr, YEL "=> Password Mismatched" RESET "\n");
 		return;
 	}
 
 	if (passwordValid() && confirmPassword.empty()) {
-		fprintf(stderr,"Please input \033[33m\033[1m \\confirm-password\033[0m before creating account.\n");
+		fprintf(stderr,"Please input " BYEL "%s" RESET " before creating account.\n", 
+			CommandHelper::CONFIRM_PASSWORD.c_str()
+			);
 		return;
 	}
 
 	if (formComplete()) {
 		#define COLOR "\033[36m\033[1m"
-		fprintf(stderr, COLOR "=> Ready to create account \n" RESET);
+		fprintf(stderr, COLOR "=> Ready to create account" RESET "\n");
 		#undef COLOR
 	}
 
-	fprintf(stderr,"\n" "    " BOLD "One account. Meet all your friends at Chatroom\n" RESET);
-	fprintf(stderr,     "    " BYEL "\\username [%s]   %s   %s   %s   %s   %s\n" RESET,
+	fprintf(stderr,"\n" "    " BOLD "One account. Meet all your friends at Chatroom" RESET "\n");
+	fprintf(stderr,     "    " BYEL "%s [%s]   %s   %s   %s   %s   %s" RESET "\n",
+		CommandHelper::USERNAME.c_str(),
 		"%s",
 		CommandHelper::PASSWORD.c_str(),
 		CommandHelper::CONFIRM_PASSWORD.c_str(),

@@ -7,6 +7,7 @@
 using namespace std;
 class CommandHelper {
 	public:
+		static const char *version;
 		static const char *arrow[2];
 		static const string strEmpty;	/* [Empty] */
 		static const string strHidden;  /* [Hidden] */

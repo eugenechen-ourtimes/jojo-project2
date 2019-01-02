@@ -43,6 +43,8 @@ const string CommandHelper::HISTORY = "\\history";
 const string CommandHelper::DOWNLOAD = "\\download";
 const string CommandHelper::DOWNLOADLIST = "\\download-list";
 
+const char *CommandHelper::version = "1.0";
+
 CommandHelper::CommandHelper(int connFd, State state)
 {
 	this->connFd = connFd;
@@ -203,7 +205,7 @@ void CommandHelper::login()
 	bool passwordFileAccessible = (fp != NULL);
 	if (passwordFileAccessible) {
 		#define COLOR "\033[33m\033[5m"
-		fprintf(stderr, COLOR "fast login\n" RESET);
+		fprintf(stderr, COLOR "fast login" RESET "\n");
 		#undef COLOR
 		if (fscanf(fp, "%s", storedPassword) == EOF) storedPassword[0] = '\0';
 		password = storedPassword;
@@ -236,7 +238,7 @@ void CommandHelper::login()
 	recv(connFd, &result, sizeof(int), 0);
 
 	if (result == Login) {
-		fprintf(stderr, GRN "=> login successful\n" RESET);
+		fprintf(stderr, GRN "=> login successful" RESET "\n");
 		setUsername(string(username));
 		setState(::ONLINE);
 		if (!passwordFileAccessible)
@@ -246,7 +248,7 @@ void CommandHelper::login()
 	}
 
 	if (result == UsernameDoesNotExist) {
-		fprintf(stderr, YEL "=> username does not exist\n" RESET);
+		fprintf(stderr, YEL "=> username does not exist" RESET "\n");
 		if (passwordFileAccessible)
 			unlink(savedPasswordPath.c_str());
 		refresh();
@@ -254,7 +256,7 @@ void CommandHelper::login()
 	}
 
 	if (result == PasswordIncorrect) {
-		fprintf(stderr, RED "=> password incorrect\n" RESET);
+		fprintf(stderr, RED "=> password incorrect" RESET "\n");
 		if (passwordFileAccessible)
 			unlink(savedPasswordPath.c_str());
 		refresh();
@@ -262,16 +264,16 @@ void CommandHelper::login()
 	}
 
 	if (result == AlreadyOnline) {
-		fprintf(stderr, CYN "=> rejected (already online)\n" RESET);
+		fprintf(stderr, CYN "=> rejected (already online)" RESET "\n");
 		return;
 	}
 
 	if (result == LoginByAnotherProcess) {
-		fprintf(stderr, CYN "=> rejected (login by another process)\n" RESET);
+		fprintf(stderr, CYN "=> rejected (login by another process)" RESET "\n");
 		return;
 	}
 	if (result == ChatroomFull) {
-		fprintf(stderr, BLU "=> rejected (chatroom full)\n" RESET);
+		fprintf(stderr, BLU "=> rejected (chatroom full)" RESET "\n");
 		return;
 	}
 
@@ -869,11 +871,11 @@ void CommandHelper::showHomePage()
 {
 	fprintf(stderr,"\t"      "*===========================*\n");
 	fprintf(stderr,"\t"      "*=                         =*\n");
-	fprintf(stderr,"\t"      "*= \033[5mWelcome to Chatroom 1.0 \033[0m=*\n");
+	fprintf(stderr,"\t"      "*= \033[5mWelcome to Chatroom %s \033[0m=*\n", version);
 	fprintf(stderr,"\t"      "*=                         =*\n");
 	fprintf(stderr,"\t"      "*===========================*\n\n");
 	fprintf(stderr,"\t"      "Start with an instruction\n");
-	fprintf(stderr,"\t" BYEL "%s    %s    %s    %s\n" RESET,
+	fprintf(stderr,"\t" BYEL "%s    %s    %s    %s" RESET "\n",
 		SIGN_UP.c_str(),
 		LOGIN.c_str(),
 		QUIT.c_str(),
@@ -888,13 +890,13 @@ void CommandHelper::showOnlinePage()
 		username.empty() ? "[anonymous]": username.c_str()
 		);
 	#undef COLOR
-	fprintf(stderr,      "\t" BYEL "%s       %s       %s [%s]\t%s [%s]\n" RESET,
+	fprintf(stderr,      "\t" BYEL "%s       %s       %s [%s]\t%s [%s]" RESET "\n",
 		SEND.c_str(),
 		LIST.c_str(),
 		HISTORY.c_str(), "%d",
 		DOWNLOADLIST.c_str(), "%d"
 		);
-	fprintf(stderr,      "\t" BYEL "%s [%s] [%s] %s         %s\n" RESET,
+	fprintf(stderr,      "\t" BYEL "%s [%s] [%s] %s         %s" RESET "\n",
 		DOWNLOAD.c_str(), "file", "time",
 		LOGOUT.c_str(),
 		HELP.c_str()

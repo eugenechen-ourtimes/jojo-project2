@@ -256,7 +256,7 @@ class Client {
 
 			#define COLOR "\033[36m\033[1m"
 			if (strCommand[0] != '\\') {
-				fprintf(stderr, COLOR "note: each command should have a prefix \'\\\'\n" RESET);
+				fprintf(stderr, COLOR "note: each command should have a prefix \'\\\'" RESET "\n");
 				return;
 			}
 			#undef COLOR
