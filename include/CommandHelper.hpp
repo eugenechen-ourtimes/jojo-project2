@@ -20,6 +20,7 @@ using namespace std;
 #define SEND	"\\send"
 #define LOGOUT	"\\logout"
 #define HISTORY	"\\history"
+#define CHAT_HISTORY	"\\chat-history"
 #define DOWNLOAD	"\\download"
 #define DOWNLOADLIST	"\\download-list"
 #define RETURN	"\\return"
@@ -34,6 +35,7 @@ class CommandHelper {
 		static const string savedPasswordFolder; /* ../data/client/pass/ */
 		static const string downloadFolder;
 		static const string downloadListFolder;
+		static const string chatHistoryFolder;
 
 		CommandHelper(int connFd, State state);
 		void help();
@@ -52,6 +54,8 @@ class CommandHelper {
 		void showDownloadList(const char *arg);
 		void downloadRequest(string filename, string timeStr);
 		void logout();
+		void showChatHistory(string username);
+		string getHistoryFolder();
 		void setState(State state);
 		State getState();
 		void setUsername(string username);
@@ -60,6 +64,7 @@ class CommandHelper {
 
 	private:
 		static const int PasswordBuffer = 1024;
+		string selfChatHistoryFolder;
 		char storedPassword[PasswordBuffer];
 		int connFd;
 		State state;

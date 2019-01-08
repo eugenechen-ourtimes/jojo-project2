@@ -20,7 +20,8 @@ enum Command
 	listUsers = 0x0a,
 	history = 0x0b,
 	download = 0x0c,
-	downloadList = 0x0d
+	downloadList = 0x0d,
+	chatHistory = 0x0e
 };
 
 #endif

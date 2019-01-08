@@ -257,6 +257,21 @@ class Client {
 				return;
 			}
 
+			if (strCommand == CHAT_HISTORY) {
+				if (helper.getState() != ::ONLINE) {
+					helper.promptStateIncorrect();
+					return;
+				}
+
+				if (ret == 1) {
+					fprintf(stderr, "missing input string\n");
+					return;
+				}
+
+				helper.showChatHistory(string(arg1));
+				return;
+			}
+
 			#define COLOR "\033[36m\033[1m"
 			if (strCommand[0] != '\\') {
 				fprintf(stderr, COLOR "note: each command should have a prefix \'\\\'" RESET "\n");
@@ -321,6 +336,24 @@ class Client {
 
 				#undef COLOR
 
+				string historyFile = helper.getHistoryFolder() + string(fromUserName);
+				FILE *fp = fopen(historyFile.c_str(), "a");
+				if (fp == NULL) {
+					perror(historyFile.c_str());
+					exit(-1);
+				}
+
+				fprintf(fp, "%s %s %s %s\t%s\n",
+					fromUserName,
+					CommandHelper::arrow[isFile],
+					helper.getUsername().c_str(),
+					content,
+					time_cstr
+				);
+
+				fclose(fp);
+
+
 				if (isFile) {
 					hasFile = true;
 					string path = CommandHelper::downloadListFolder + helper.getUsername();
@@ -343,6 +376,7 @@ class Client {
 
 	private:
 		int connFd;
+		string selfChatHistoryFolder;
 		int connect(bool first) {
 			struct addrinfo hints;
 			struct addrinfo *result, *rp;

@@ -1,3 +1,4 @@
+#include "TimeUtils.hpp"
 #include "CommandHelper.hpp"
 #include "color.hpp"
 #include "Command.hpp"
@@ -17,6 +18,9 @@
 
 using namespace std;
 
+char TimeUtils::time_cstr[32] = "";
+char TimeUtils::buffer[32] = "";
+
 const char *CommandHelper::arrow[2] = {"=>", "->"};
 const char *del = "-----------------------------------------------";
 
@@ -25,6 +29,7 @@ const string CommandHelper::strHidden = "[Hidden]";
 const string CommandHelper::savedPasswordFolder = "../data/client/pass/";
 const string CommandHelper::downloadFolder = "../data/client/download/";
 const string CommandHelper::downloadListFolder = "../data/client/downloadList/";
+const string CommandHelper::chatHistoryFolder = "../data/client/history/";
 
 const char *CommandHelper::version = "1.0";
 
@@ -188,6 +193,8 @@ void CommandHelper::login()
 		setState(::ONLINE);
 		if (!passwordFileAccessible)
 			savePassword(savedPasswordPath.c_str(), password);
+		selfChatHistoryFolder = chatHistoryFolder + getUsername() + '/';
+		mkdirIfNotExist(selfChatHistoryFolder.c_str());
 		refresh();
 		return;
 	}
@@ -399,6 +406,31 @@ void CommandHelper::sendMessage(string target, string message)
 
 	send(connFd, &messageLen, sizeof(int), 0);
 	send(connFd, message.c_str(), messageLen, 0);
+
+	string path = selfChatHistoryFolder + target;
+
+	char *time_cstr = TimeUtils::get_time_cstr(time(NULL));
+	if (time_cstr == NULL) {
+		TimeUtils::showError();
+		exit(-1);
+	}
+
+
+	FILE *fp = fopen(path.c_str(), "a");
+	if (fp == NULL) {
+		perror(path.c_str());
+		exit(-1);
+	}
+
+	fprintf(fp, "%s %s %s %s\t%s\n",
+		getUsername().c_str(),
+		arrow[false],
+		target.c_str(),
+		message.c_str(),
+		time_cstr
+	);
+
+	fclose(fp);
 }
 
 void CommandHelper::sendFile(string target, string arg)
@@ -532,6 +564,32 @@ void CommandHelper::sendFile(string target, string arg)
 		}
 
 		fprintf(stderr, "%s uploaded\n", filename);
+
+		string pth = selfChatHistoryFolder + target;
+
+		char *time_cstr = TimeUtils::get_time_cstr(time(NULL));
+		if (time_cstr == NULL) {
+			TimeUtils::showError();
+			exit(-1);
+		}
+
+
+		FILE *historyFile = fopen(pth.c_str(), "a");
+		if (historyFile == NULL) {
+			perror(pth.c_str());
+			exit(-1);
+		}
+
+		fprintf(historyFile, "%s %s %s %s\t%s\n",
+			getUsername().c_str(),
+			arrow[true],
+			target.c_str(),
+			filename,
+			time_cstr
+		);
+
+		fclose(historyFile);
+
 		fclose(fp); free(path); free(ts);
 	}
 
@@ -778,6 +836,47 @@ void CommandHelper::logout()
 	} else {
 		fprintf(stderr, "username incorrect\n");
 	}
+}
+
+void CommandHelper::showChatHistory(string username)
+{
+	string path = selfChatHistoryFolder + username;
+	FILE *fp = fopen(path.c_str(), "r");
+	if (fp == NULL) {
+		if (errno != ENOENT) {
+			perror(path.c_str());
+			exit(-1);
+		}
+
+		fprintf(stderr, "history is empty\n");
+		return;
+	}
+
+	char srcUser[64];
+	char arrow[64];
+	char dstUser[64];
+	char content[64];
+	char time_cstr[64];
+	#define COLOR "\033[36m\033[1m"
+
+	while (fscanf(fp, "%s%s%s%s%s", srcUser, arrow, dstUser, content, time_cstr) != EOF) {
+		fprintf(stderr, COLOR "%s" RESET " %s " COLOR "%s" RESET " %s\t%s\n",
+			srcUser,
+			arrow,
+			dstUser,
+			content,
+			time_cstr
+			);
+	}
+
+	#undef COLOR
+
+	fclose(fp);
+}
+
+string CommandHelper::getHistoryFolder()
+{
+	return selfChatHistoryFolder;
 }
 
 void CommandHelper::setState(State state)
