@@ -125,7 +125,9 @@ class Server {
 		}
 
 		void run() {
+			char input[1024];
 			CommandHandler handler(*this);
+			FD_SET(STDIN_FILENO, &readFds);
 			FD_SET(listenFd, &readFds);
 
 			while (true) {
@@ -148,6 +150,18 @@ class Server {
 				/* onlineUsers:  username -> socketAddr */
 
 				checkConnections(handler);
+
+				if (FD_ISSET(STDIN_FILENO, &copy)) {
+					scanf("%s", input);
+					if (strcmp(input, "close") == 0) {
+						map < SocketAddr, int >::iterator it;
+						int closing = END_CONNECTION;
+						for (it = connections.begin(); it != connections.end(); it++) {
+							send(it->second, &closing, sizeof(int), 0);
+						}
+						exit(0);
+					}
+				}
 			}
 		}
 
@@ -488,6 +502,7 @@ void Server::CommandHandler::createAccount(int connFd)
 		fprintf(server.usersFile, "%s %s\n",
 			username,
 			hashedPassword.c_str());
+		fflush(server.usersFile);
 	}
 
 	send(connFd, &result, sizeof(int), 0);

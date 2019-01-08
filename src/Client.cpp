@@ -284,7 +284,7 @@ class Client {
 
 		bool handleDataFromServer(int fd, CommandHelper &helper)
 		{
-			int numOfLines = -1;
+			int numOfLines;
 			char fromUserName[64], content[256];
 			char time_cstr[32];
 			int fromUserNameLen, contentLen;
@@ -292,9 +292,15 @@ class Client {
 
 			int type = Zero;
 			int ret = recv(fd, &numOfLines, sizeof(int), 0);
+
 			if (ret == 0) {
-				fprintf(stderr, "server disconnected\n");
+				fprintf(stderr, "server disconnected unexpectedly\n");
 				return false;
+			}
+
+			if (numOfLines < 0 && ret == sizeof(int)) {
+				fprintf(stderr, "server closed\n");
+				exit(0);
 			}
 
 			bool hasFile = false;

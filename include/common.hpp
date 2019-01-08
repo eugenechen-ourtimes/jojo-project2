@@ -4,6 +4,7 @@
 #define IOBufSize 1024
 #define MB 1048576
 #define Limit 20
+#define END_CONNECTION -1
 #define MaxFile Limit * MB
 
 #include <stdio.h>
